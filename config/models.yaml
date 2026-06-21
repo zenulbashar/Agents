@@ -1,0 +1,92 @@
+# =============================================================================
+# Foundry — MODEL ROUTING POLICY
+# =============================================================================
+# Maps the abstract tiers used in agents.yaml to concrete models, and defines
+# the router's behaviour. The router (orchestrator/router) picks the cheapest
+# tier that can do the task, escalating on low confidence / failure / explicit
+# request. See docs/08-model-strategy.md.
+# =============================================================================
+
+# ---- Concrete models behind each tier ---------------------------------------
+# Local models are served by Ollama natively on the Mac (Metal acceleration).
+# Cloud models are called via API and are subject to the daily budget cap.
+tiers:
+
+  local-small:
+    purpose: "Routing, classification, triage, trivial edits, summarisation."
+    provider: ollama
+    model: "qwen2.5-coder:7b"
+    alt: ["llama3.2:3b"]
+    ctx: 32768
+    est_ram_gb: 6
+    cost: free-local
+
+  local-mid:
+    purpose: "Workhorse: most coding, docs, content, analysis."
+    provider: ollama
+    model: "qwen2.5-coder:32b"          # drop to :14b on <=24GB RAM machines
+    alt: ["deepseek-coder-v2:16b", "qwen2.5-coder:14b"]
+    ctx: 32768
+    est_ram_gb: 20
+    cost: free-local
+
+  local-large:
+    purpose: "Heavier reasoning / architecture when offline or cost-bound."
+    provider: ollama
+    model: "llama3.3:70b-instruct-q4_K_M" # needs ~40GB+; else use qwen2.5:32b
+    alt: ["qwen2.5:72b-instruct-q4_K_M"]
+    ctx: 32768
+    est_ram_gb: 42
+    cost: free-local
+
+  cloud-reasoning:
+    purpose: "Strong reasoning, code review, security analysis when it pays off."
+    provider: anthropic
+    model: "claude-sonnet-4-6"
+    alt: ["gpt (frontier)", "gemini (frontier)"]   # fallbacks if Anthropic unavailable
+    ctx: 200000
+    cost: metered
+
+  cloud-frontier:
+    purpose: "Hardest architecture, final security/code-review gate, ambiguous reasoning."
+    provider: anthropic
+    model: "claude-opus-4-8"
+    alt: ["gpt (frontier reasoning)", "gemini (frontier)"]
+    ctx: 200000
+    cost: premium-metered
+
+# ---- Embeddings (RAG) -------------------------------------------------------
+embeddings:
+  provider: ollama
+  model: "nomic-embed-text"        # 768-dim, local, fast
+  dim: 768
+  alt: ["mxbai-embed-large (1024-dim, higher quality)"]
+
+# ---- Router policy ----------------------------------------------------------
+router:
+  # The router starts at the agent's `primary` tier and escalates to `fallback`
+  # (then to cloud-frontier) when any trigger fires.
+  escalation_triggers:
+    - "self-reported confidence < 0.6"
+    - "task tagged high-risk (security review, prod arch, payments)"
+    - "2 consecutive tool/test failures on the same step"
+    - "code-review verdict = request-changes twice on the same PR"
+    - "operator explicitly requests a stronger model"
+  deescalation:
+    - "Routine retries and follow-ups stay on the cheapest tier that succeeded."
+  offline_mode:
+    # If no network / budget exhausted, map cloud tiers down to local-large.
+    cloud-reasoning: local-large
+    cloud-frontier: local-large
+  budget:
+    daily_usd_env: CLOUD_DAILY_BUDGET_USD   # circuit breaker; see CFO agent
+    on_breach: "Stop new cloud calls; finish in-flight; alert operator + CFO; fall back to local."
+
+# ---- Capability notes -------------------------------------------------------
+notes:
+  - "Image generation (UI/Graphic/Branding) is NOT an LLM tier: use a local SDXL/Flux
+     endpoint or a cloud image API behind the `image.generate` tool."
+  - "Vision/multimodal review (e.g. comparing a built screen to a mockup) routes to a
+     vision-capable cloud model on demand."
+  - "On a 24GB Mac Mini, set local-mid -> qwen2.5-coder:14b and skip local-large
+     (use cloud-reasoning instead). On 64GB, local-large is comfortable."
