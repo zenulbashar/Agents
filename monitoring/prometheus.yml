@@ -1,0 +1,11 @@
+# Minimal Prometheus config for Foundry. Add scrape targets as services expose /metrics.
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+  - job_name: foundry-orchestrator
+    static_configs:
+      - targets: ["host.docker.internal:8800"]   # native orchestrator metrics endpoint
