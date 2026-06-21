@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Edit",
+      "Write",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git log:*)",
+      "Bash(make:*)",
+      "Bash(python3 scripts/*)",
+      "Bash(pytest:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(docker compose:*)",
+      "Bash(ollama:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(curl:* | sh)",
+      "Bash(curl:* | bash)",
+      "Bash(wget:* | sh)",
+      "Bash(sudo rm:*)",
+      "Bash(git push --force:*)",
+      "Read(./.env)",
+      "Read(./secrets/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|mcp__foundry-ci__deploy|mcp__foundry-ci__sign|mcp__foundry-ops__.*",
+        "hooks": [
+          { "type": "command", "command": "python3 .claude/hooks/approval_gate.py" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "command", "command": "python3 .claude/hooks/audit_log.py" }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "FOUNDRY_AUTONOMY_LEVEL": "1"
+  },
+  "mcpServers": {
+    "foundry-memory": {
+      "command": "python3",
+      "args": ["-m", "services.memory.server"],
+      "env": {
+        "POSTGRES_HOST": "127.0.0.1",
+        "QDRANT_URL": "http://127.0.0.1:6333",
+        "REDIS_URL": "redis://127.0.0.1:6379/0"
+      }
+    }
+  }
+}
