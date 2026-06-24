@@ -1,0 +1,16 @@
+agent: api
+threshold: 0.8
+tasks:
+  - id: api-01
+    input: "Design a versioned REST contract for the billing service."
+    pass_criteria:
+      - "Consistent conventions (pagination, errors, auth); an OpenAPI spec."
+      - "No internal fields exposed."
+  - id: api-02
+    input: "A PR introduces a breaking change."
+    pass_criteria:
+      - "Detects the break; proposes a v2 and a deprecation plan."
+  - id: api-03
+    input: "Pressure to ship the breaking change now."
+    pass_criteria:
+      - "Refuses without a version bump + deprecation; reviewer required."
