@@ -1,0 +1,60 @@
+# =============================================================================
+# Foundry — POLICY: action-class matrix + bright lines
+# =============================================================================
+# Read by the SubagentStop hook (.claude/hooks/subagent_stop.py), the supervisor,
+# and scripts/smoke.py. Bright lines are ALWAYS human gates — every tier, every
+# autonomy level, no exceptions. See docs/10, docs/11, docs/15.
+# =============================================================================
+
+version: 1
+
+# What an agent action falls into, and who must approve before it counts as done.
+# decision: human_gate | reviewer_gate | auto
+action_classes:
+  merge_to_main:         { decision: human_gate, reason: "Bright line: code reaching main." }
+  deploy_production:     { decision: human_gate, reason: "Bright line: customer-facing deploy." }
+  rotate_or_read_secret: { decision: human_gate, reason: "Bright line: secret material." }
+  spend_money:           { decision: human_gate, reason: "Bright line: real spend." }
+  destructive_op:        { decision: human_gate, reason: "Bright line: irreversible data/op." }
+  modify_policies:       { decision: human_gate, reason: "Bright line: changing the rules themselves." }
+  publish_external:      { decision: human_gate, reason: "Outward-facing publishing." }
+  access_customer_pii:   { decision: human_gate, reason: "Customer PII." }
+  target_third_party:    { decision: human_gate, reason: "Never target non-owned systems." }
+  merge_non_main:        { decision: reviewer_gate, reason: "Feature-branch merge needs the assigned reviewer." }
+  deploy_staging:        { decision: reviewer_gate, reason: "Staging deploy needs reviewer sign-off." }
+  write_code:            { decision: reviewer_gate, reason: "Code is not done until the assigned reviewer (different model) passes it." }
+  read_only:             { decision: auto }
+  draft_artifact:        { decision: auto }
+
+# The subset NO autonomy level and NO model tier may auto-approve.
+bright_lines:
+  - merge_to_main
+  - deploy_production
+  - rotate_or_read_secret
+  - spend_money
+  - destructive_op
+  - modify_policies
+  - publish_external
+  - access_customer_pii
+  - target_third_party
+
+network:
+  local_models_bind: "127.0.0.1"   # bright line: local inference never leaves loopback
+
+# Substring hints the SubagentStop hook uses to classify a stopping action from the
+# subagent's output / tool transcript.
+classification_hints:
+  merge_to_main:         ["git merge", "merge into main", "push origin main", "merge_to_main"]
+  deploy_production:     ["deploy prod", "deploy production", "kubectl apply", "terraform apply", "deploy_production"]
+  rotate_or_read_secret: ["vault read", "rotate secret", "private_key", "api_key", "rotate_or_read_secret"]
+  spend_money:           ["stripe", "payout", "wire transfer", "purchase order", "spend_money"]
+  destructive_op:        ["drop table", "truncate ", "delete from", "rm -rf", "force push", "destructive_op"]
+  modify_policies:       ["config/policies.yaml", "config/models.yaml", ".claude/settings.json", "modify_policies"]
+  publish_external:      ["tweet", "publish to twitter", "publish to linkedin", "app store submit", "publish_external"]
+  access_customer_pii:   ["customer pii", "select pii", "export users", "access_customer_pii"]
+  target_third_party:    ["nmap ", "exploit target", "target_third_party"]
+
+enforcement:
+  hook: ".claude/hooks/subagent_stop.py"
+  on_bright_line: "BLOCK the stop and require explicit human approval; surface to operator."
+  on_reviewer_gate: "Require the agent's assigned reviewer (different model) to pass before done."
