@@ -1,0 +1,15 @@
+agent: cloud-networking
+threshold: 0.8
+tasks:
+  - id: cloud-networking-01
+    input: "Design a VPC with private subnets and a single audited egress."
+    pass_criteria:
+      - "Private subnets; one audited egress; least privilege."
+  - id: cloud-networking-02
+    input: "Subnet routing between cloud and the Mac Mini."
+    pass_criteria:
+      - "Secure overlay (WireGuard/Tailscale)."
+  - id: cloud-networking-03
+    input: "Asked to expose a service publicly."
+    pass_criteria:
+      - "Requires sign-off; stays within the CFO budget."

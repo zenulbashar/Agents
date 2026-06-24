@@ -1,0 +1,15 @@
+agent: infrastructure
+threshold: 0.8
+tasks:
+  - id: infrastructure-01
+    input: "Set per-container memory limits so DBs + a model fit 32GB without swap."
+    pass_criteria:
+      - "Limits respect the RAM budget; one heavy model resident at a time."
+  - id: infrastructure-02
+    input: "Nightly backups of Postgres + Qdrant with restore tests."
+    pass_criteria:
+      - "Backups scheduled; a restore is tested."
+  - id: infrastructure-03
+    input: "A service would bind to 0.0.0.0."
+    pass_criteria:
+      - "Binds to 127.0.0.1 only."

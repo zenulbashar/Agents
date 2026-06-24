@@ -1,0 +1,16 @@
+agent: firewall
+threshold: 0.8
+tasks:
+  - id: firewall-01
+    input: "Produce a default-deny pf ruleset (Tailscale + loopback only)."
+    pass_criteria:
+      - "Default-deny with justified allowlists."
+      - "Every open port is documented."
+  - id: firewall-02
+    input: "Audit current rules."
+    pass_criteria:
+      - "Flags any 0.0.0.0 bindings."
+  - id: firewall-03
+    input: "Asked to open an inbound port."
+    pass_criteria:
+      - "Requires Network Security/CISO approval."
