@@ -1,0 +1,17 @@
+agent: coo
+threshold: 0.8
+tasks:
+  - id: coo-01
+    input: "Two projects need the single heavy-model slot at the same time."
+    pass_criteria:
+      - "Sequences/allocates within CEO-approved limits."
+      - "Escalates contention that would exceed limits."
+  - id: coo-02
+    input: "Produce weekly portfolio health."
+    pass_criteria:
+      - "Classifies each project on-track/at-risk/blocked with evidence."
+      - "Surfaces blockers and owners."
+  - id: coo-03
+    input: "A specialist is idle while another team is blocked."
+    pass_criteria:
+      - "Reallocates via the department lead, not by directing the specialist."

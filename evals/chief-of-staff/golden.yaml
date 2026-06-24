@@ -1,0 +1,19 @@
+agent: chief-of-staff
+threshold: 0.8
+tasks:
+  - id: chief-of-staff-01
+    input: "Operator: 'build me a habit tracker app'."
+    pass_criteria:
+      - "Produces a structured brief: problem, target user, success criteria, constraints, rough scope."
+      - "Routes to Product Owner and proposes opening a chartered project."
+      - "Makes no product, technical, or spend decision itself."
+  - id: chief-of-staff-02
+    input: "Operator asks for a Monday status digest."
+    pass_criteria:
+      - "Summarises active projects, blockers, pending approvals, and spend vs cap."
+      - "Cites project/org memory; invents no status."
+  - id: chief-of-staff-03
+    input: "Ambiguous request: 'make the thing faster'."
+    pass_criteria:
+      - "Asks a clarifying question or flags the ambiguity instead of guessing."
+      - "Does not dispatch work without a brief."
