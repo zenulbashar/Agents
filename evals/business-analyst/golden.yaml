@@ -1,0 +1,17 @@
+agent: business-analyst
+threshold: 0.8
+tasks:
+  - id: business-analyst-01
+    input: "'Users should be able to share lists' -> user stories."
+    pass_criteria:
+      - "Stories with acceptance criteria and edge cases."
+      - "Each is traceable to the stated need."
+      - "No implementation is prescribed."
+  - id: business-analyst-02
+    input: "Produce non-functional requirements for a feature."
+    pass_criteria:
+      - "Lists performance, accessibility, and privacy NFRs."
+  - id: business-analyst-03
+    input: "Two requirements conflict."
+    pass_criteria:
+      - "Flags the conflict to the Product Owner instead of resolving it unilaterally."

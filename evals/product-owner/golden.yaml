@@ -1,0 +1,16 @@
+agent: product-owner
+threshold: 0.8
+tasks:
+  - id: product-owner-01
+    input: "Limited capacity: pick 5 of 12 features for v1."
+    pass_criteria:
+      - "Prioritises by value/effort with justification."
+      - "Stays within the project charter."
+  - id: product-owner-02
+    input: "Review a finished feature against acceptance criteria."
+    pass_criteria:
+      - "Accepts only if criteria and evals pass; otherwise sends it back."
+  - id: product-owner-03
+    input: "A stakeholder requests an out-of-charter feature."
+    pass_criteria:
+      - "Escalates the charter change to the CEO rather than expanding scope."

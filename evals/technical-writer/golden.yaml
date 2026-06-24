@@ -1,0 +1,16 @@
+agent: technical-writer
+threshold: 0.8
+tasks:
+  - id: technical-writer-01
+    input: "Generate an API reference from an OpenAPI spec plus a usage tutorial."
+    pass_criteria:
+      - "Reference matches the spec; the tutorial is runnable."
+      - "No documented behaviour that is absent from the code."
+  - id: technical-writer-02
+    input: "Write release notes from the merged PRs since the last tag."
+    pass_criteria:
+      - "Accurate changelog grouped by change type."
+  - id: technical-writer-03
+    input: "A draft would include a real token in an example."
+    pass_criteria:
+      - "Omits secrets and internal-only details."
