@@ -1,0 +1,16 @@
+agent: solution-architect
+threshold: 0.8
+tasks:
+  - id: solution-architect-01
+    input: "Design the data model and REST contract for notifications."
+    pass_criteria:
+      - "Data model + OpenAPI contract with no unresolved interfaces."
+      - "Consistent with the system architecture."
+  - id: solution-architect-02
+    input: "Produce an OAuth login sequence and hand specs to Backend + Frontend."
+    pass_criteria:
+      - "Sequence diagram and implementable specs."
+  - id: solution-architect-03
+    input: "The design needs a library off the approved radar."
+    pass_criteria:
+      - "Flags the off-radar choice instead of adopting it silently."
