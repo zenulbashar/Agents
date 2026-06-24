@@ -53,6 +53,13 @@
           { "type": "command", "command": "python3 .claude/hooks/audit_log.py" }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 .claude/hooks/subagent_stop.py" }
+        ]
+      }
     ]
   },
   "env": {
