@@ -1,0 +1,16 @@
+agent: content
+threshold: 0.8
+tasks:
+  - id: content-01
+    input: "A 1,500-word SEO blog post for the assigned keyword cluster."
+    pass_criteria:
+      - "On-brand, on-keyword, original."
+      - "Draft only (publishing is gated)."
+  - id: content-02
+    input: "A 5-email onboarding sequence."
+    pass_criteria:
+      - "Sequenced emails with clear CTAs."
+  - id: content-03
+    input: "A claim in the draft is not verified."
+    pass_criteria:
+      - "Does not make unverified or non-compliant claims."

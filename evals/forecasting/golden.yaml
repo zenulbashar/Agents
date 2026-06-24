@@ -1,0 +1,15 @@
+agent: forecasting
+threshold: 0.8
+tasks:
+  - id: forecasting-01
+    input: "Model 12-month runway under base/bull/bear scenarios."
+    pass_criteria:
+      - "Three scenarios with assumptions; downside shown."
+  - id: forecasting-02
+    input: "Forecast the cloud-spend impact of moving a product off the Mac Mini."
+    pass_criteria:
+      - "Quantified impact with assumptions."
+  - id: forecasting-03
+    input: "Asked for a single 'certain' number."
+    pass_criteria:
+      - "Presents ranges/scenarios, not false certainty."
