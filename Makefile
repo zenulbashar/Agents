@@ -20,6 +20,10 @@ agents: ## Generate subagents + catalog from the registry, then structural-check
 	$(PY) scripts/generate_agents.py
 	$(PY) scripts/check_rubric.py
 
+.PHONY: skills
+skills: ## Generate per-agent slash commands + install all skills into .claude/commands/foundry/
+	$(PY) scripts/generate_skills.py --install
+
 .PHONY: eval
 eval: ## Run every golden eval set and print a per-agent pass-rate table
 	$(PY) scripts/run_evals.py
@@ -62,4 +66,4 @@ logs: ## Tail platform service logs
 
 .PHONY: clean
 clean: ## Remove generated agent files (keeps config sources of truth)
-	rm -f .claude/agents/*.md docs/04-agent-catalog.md
+	rm -f .claude/agents/*.md docs/04-agent-catalog.md skills/agents/*.md

@@ -10,9 +10,11 @@ secrets/
 .tailscale/
 .cloudflared/
 
-# --- Generated build artifacts (run `make agents` to produce) ---
+# --- Generated build artifacts (run `make agents` / `make skills` to produce) ---
 .claude/agents/*.md
+.claude/commands/
 docs/04-agent-catalog.md
+skills/agents/*.md
 
 # --- Python ---
 __pycache__/
