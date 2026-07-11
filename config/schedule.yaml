@@ -1,0 +1,22 @@
+# =============================================================================
+# Foundry — recurring 24/7 jobs (run by services/runtime/foundryd.py)
+# =============================================================================
+# Times are Australia/Brisbane. Side-effecting jobs still pass the gates
+# (config/policies.yaml) - e.g. the marketing batch only writes the review queue.
+# =============================================================================
+
+version: 1
+
+jobs:
+  - { agent: ceo,               cron: "0 8 * * *",    task: "Compile and send the daily operator report via Telegram (projects, pending approvals, spend vs cap, incidents, what we learned)." }
+  - { agent: brain,             cron: "30 2 * * *",   task: "Re-index the vault; flag stale/contradictory notes for the owning agents." }
+  - { agent: learning-officer,  cron: "0 3 * * *",    task: "Scan allowlisted AI-industry sources; update vault/40-industry/ai-industry-watch; draft any adoption proposals (gated)." }
+  - { agent: marketing-director, cron: "0 6 * * 1",   task: "Kick the Monday marketing batch: generate the week's content to the Google Sheet review queue - NOTHING publishes." }
+  - { agent: infrastructure,    cron: "0 1 * * *",    task: "Nightly backup of the memory stores; verify a restore." }
+  - { agent: support,           cron: "*/30 * * * *", task: "Triage new support tickets (KB-assisted); draft sensitive replies for approval." }
+
+free_time_learning:
+  note: >
+    When an agent has no queued work, foundryd may schedule its learning-officer path
+    (self_study: sandboxed, logged, no side effects, proposals gated). This is 'each
+    agent learns in their free time'.

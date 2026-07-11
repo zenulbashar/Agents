@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Foundry 24/7 agent runtime. Replace USERNAME with your Mac username, copy to
+     ~/Library/LaunchAgents/, then: launchctl load -w ~/Library/LaunchAgents/com.foundry.daemon.plist
+     KeepAlive=true means macOS restarts it on crash or reboot - 24/7 without Cowork. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.foundry.daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/USERNAME/foundry/services/runtime/foundryd.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/USERNAME/foundry</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/USERNAME/foundry/logs/foundryd.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/USERNAME/foundry/logs/foundryd.err.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FOUNDRY_HOME</key><string>/Users/USERNAME/foundry</string>
+  </dict>
+</dict>
+</plist>
