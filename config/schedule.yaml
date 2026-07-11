@@ -9,8 +9,9 @@ version: 1
 
 jobs:
   - { agent: ceo,               cron: "0 8 * * *",    task: "Compile and send the daily operator report via Telegram (projects, pending approvals, spend vs cap, incidents, what we learned)." }
-  - { agent: brain,             cron: "30 2 * * *",   task: "Re-index the vault; flag stale/contradictory notes for the owning agents." }
+  - { agent: brain,             cron: "30 2 * * *",   task: "Re-index the vault (incl. how-to-do-this-job); flag stale/contradictory notes for the owning agents." }
   - { agent: learning-officer,  cron: "0 3 * * *",    task: "Scan allowlisted AI-industry sources; update vault/40-industry/ai-industry-watch; draft any adoption proposals (gated)." }
+  - { agent: learning-officer,  cron: "0 4 * * 1",    task: "Curate vault/10-knowledge/how-to-do-this-job field notes: fold durable lessons into the doctrine and keep the compressed per-agent version (scripts/generate_agents.py) in sync via make agents; any change that LOOSENS a verification bar or bright line is operator-gated." }
   - { agent: marketing-director, cron: "0 6 * * 1",   task: "Kick the Monday marketing batch: generate the week's content to the Google Sheet review queue - NOTHING publishes." }
   - { agent: infrastructure,    cron: "0 1 * * *",    task: "Nightly backup of the memory stores; verify a restore." }
   - { agent: support,           cron: "*/30 * * * *", task: "Triage new support tickets (KB-assisted); draft sensitive replies for approval." }
@@ -19,4 +20,6 @@ free_time_learning:
   note: >
     When an agent has no queued work, foundryd may schedule its learning-officer path
     (self_study: sandboxed, logged, no side effects, proposals gated). This is 'each
-    agent learns in their free time'.
+    agent learns in their free time'. Lessons worth keeping are logged as dated,
+    attributed field notes in vault/10-knowledge/how-to-do-this-job (the living
+    operating doctrine), for the learning-officer to curate.

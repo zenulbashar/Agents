@@ -4,6 +4,7 @@ The index of the Foundry brain. #moc
 
 ## Company
 - [[what-is-foundry]] - what this company is and how it decides
+- [[how-to-do-this-job]] - the operating doctrine every agent runs on (living document)
 - [[how-to-ask-the-brain]] - how any agent resolves a doubt
 - Governance: `config/policies.yaml` (chain of command + bright lines), `config/access.yaml` (containment)
 

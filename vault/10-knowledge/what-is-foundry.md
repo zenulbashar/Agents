@@ -20,6 +20,7 @@ Source of truth: `config/policies.yaml`.
   egress (`config/access.yaml`). It cannot touch the rest of the Mac.
 - **Reviewer on a different model** and **eval-gated merges** (see `docs/15`).
 - **Every action is logged** to `logs/activity/<agent>.jsonl`, viewable remotely (`docs/18`).
+- **How to work:** [[how-to-do-this-job]] - the operating doctrine (ledger, verify, calibrate, adversarial self-review) every agent runs on.
 - **When in doubt** -> [[how-to-ask-the-brain]].
 
 See also: `docs/16-audit-and-governance.md`.
