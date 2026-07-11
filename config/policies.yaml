@@ -1,71 +1,86 @@
 # =============================================================================
-# Foundry — POLICY v2: chain of command + action-class matrix + bright lines
+# Foundry — POLICY v3: chain of command + action-class matrix + bright lines
 # =============================================================================
-# Read by the SubagentStop hook (.claude/hooks/subagent_stop.py), the supervisor,
-# scripts/smoke.py, and every agent's operating rules. Bright lines are ALWAYS
-# human gates - every tier, every autonomy level. See docs/10, docs/11, docs/16.
+# Read by the SubagentStop hook (subagent_stop.py), the supervisor, smoke.py, and
+# every agent. Bright lines are ALWAYS operator-verified. See docs/10, 11, 16, 19.
 # =============================================================================
 
-version: 2
+version: 3
+
+# ---- Runtime posture (operator: 24/7 on n8n; Cowork is setup-only) ----------
+runtime:
+  always_on: "n8n + headless agent runtime under launchd on the Mac Mini - survives reboots."
+  cowork: "Claude Cowork is used ONLY to set this up, then can be removed. Agents MUST keep
+           running without Cowork (Cowork-independent runtime). See docs/19."
+
+# ---- Operator interface (CEO reports to the operator via Telegram) ----------
+operator_interface:
+  channel: telegram
+  who: "The CEO agent reports to the operator and routes every approval request via Telegram."
+  approvals: "Bright-line and executive-escalated actions are sent to the operator on Telegram
+              with approve/reject; nothing gated proceeds without a reply. See services/telegram."
+  autonomy: "Start at Level 0-1 (operator approves via Telegram). Graduate only when the operator
+             is confident. The learning loop keeps improving (learning-officer + brain + evals)."
 
 # ---- Chain of command: ASK YOUR EXECUTIVE BEFORE ACTING ---------------------
-# The operator requirement: agents propose, an executive approves, then the agent
-# acts. Reads/drafts/research are free; anything side-effecting needs approval.
 chain_of_command:
-  approval_posture: propose-approve          # default posture for every agent
+  approval_posture: propose-approve
   rule: >
-    Before ANY side-effecting action, an agent must obtain approval from its
-    executive (its reports_to in config/agents.yaml). Bright lines ALWAYS require
-    the operator (human), never just an executive. Read-only research, drafting,
-    and self-study need no approval.
+    Before ANY side-effecting action, an agent obtains approval from its executive
+    (reports_to). Bright lines ALWAYS require the operator (via Telegram), never an
+    executive alone. Reads, research, and drafts need no approval.
   free_without_approval: [read_only, draft_artifact, research, self_study, update_vault]
   needs_executive_approval:
-    [write_code, merge_non_main, deploy_staging, spend_below_cap, send_internal,
+    [write_code, merge_non_main, deploy_staging, spend_below_cap, create_ephemeral_agent,
      update_vault_canon, publish_draft_to_queue]
-  needs_operator_approval: bright_lines       # see below
-  when_in_doubt: "Consult the `brain` agent and the Obsidian vault (vault/) before acting or escalating."
+  needs_operator_approval: bright_lines
+  when_in_doubt: "Consult the `brain` agent and the vault (vault/) before acting or escalating."
   escalation_root: operator
 
-# ---- What an action falls into, and who must approve before it is 'done' -----
-# decision: human_gate | executive_gate | reviewer_gate | auto
+# ---- Action classes: decision = human_gate | executive_gate | reviewer_gate | auto
 action_classes:
-  # Bright lines (human only)
+  # Bright lines (operator-verified, via Telegram)
   merge_to_main:           { decision: human_gate, reason: "Bright line: code reaching main." }
   deploy_production:       { decision: human_gate, reason: "Bright line: customer-facing deploy." }
   rotate_or_read_secret:   { decision: human_gate, reason: "Bright line: secret material." }
   spend_money:             { decision: human_gate, reason: "Bright line: real spend above cap." }
+  delete_or_remove:        { decision: human_gate, reason: "Bright line: ANY delete/remove/deprovision must be verified by the operator." }
   destructive_op:          { decision: human_gate, reason: "Bright line: irreversible data/op." }
   modify_policies:         { decision: human_gate, reason: "Bright line: changing the rules." }
-  create_or_modify_agent:  { decision: human_gate, reason: "Bright line: hiring/creating or re-scoping an agent changes the org." }
-  modify_skill_or_tool:    { decision: human_gate, reason: "Bright line: changing an agent's skills/tools changes behaviour." }
-  publish_external:        { decision: human_gate, reason: "Outward-facing publishing (posts, store, blog)." }
+  register_permanent_agent:{ decision: human_gate, reason: "Bright line: a PERMANENT agent joins the org." }
+  modify_agent:            { decision: human_gate, reason: "Bright line: re-scoping an existing agent." }
+  modify_skill_or_tool:    { decision: human_gate, reason: "Bright line: changing skills/tools changes behaviour." }
+  publish_external:        { decision: human_gate, reason: "Outward-facing publishing." }
   send_email_external:     { decision: human_gate, reason: "Commercial email - Spam Act 2003; each send reviewed." }
   access_customer_pii:     { decision: human_gate, reason: "Customer PII." }
   target_third_party:      { decision: human_gate, reason: "Never target non-owned systems." }
-  # Executive-gated (the agent's reports_to must approve)
-  write_code:              { decision: executive_gate, reason: "Side-effect: code change - executive approves before merge path." }
-  merge_non_main:          { decision: executive_gate, reason: "Feature-branch merge needs the reviewer + executive." }
+  # Executive-gated (the agent's reports_to approves) - includes QUICK agent spin-up
+  create_ephemeral_agent:  { decision: executive_gate, reason: "Quick, sandboxed, AUTO-EXPIRING worker for an urgent scoped task; capped, least-privilege, no bright-line powers. Not a permanent hire." }
+  write_code:              { decision: executive_gate, reason: "Side-effect: code change." }
+  merge_non_main:          { decision: executive_gate, reason: "Feature-branch merge needs reviewer + executive." }
   deploy_staging:          { decision: executive_gate, reason: "Staging deploy needs executive sign-off." }
+  spend_below_cap:         { decision: executive_gate, reason: "Spend within the daily cap." }
   publish_draft_to_queue:  { decision: executive_gate, reason: "Queueing content for later human-approved posting." }
-  update_vault_canon:      { decision: executive_gate, reason: "Editing shared canon in the vault (not personal notes)." }
-  # Reviewer-gated
-  code_review_pass:        { decision: reviewer_gate, reason: "A different-model reviewer must pass the change." }
-  # Auto (no approval)
+  update_vault_canon:      { decision: executive_gate, reason: "Editing shared canon (not personal notes)." }
+  # Reviewer-gated / auto
+  code_review_pass:        { decision: reviewer_gate, reason: "A different-model reviewer must pass." }
   read_only:               { decision: auto }
   draft_artifact:          { decision: auto }
   research:                { decision: auto }
-  self_study:              { decision: auto, note: "Free-time learning: sandboxed, logged, no side effects, proposals are gated." }
+  self_study:              { decision: auto, note: "Free-time learning: sandboxed, logged, no side effects; proposals gated." }
   update_vault:            { decision: auto, note: "Personal notes in the agent's own vault area." }
 
-# The subset NO autonomy level and NO model tier may auto-approve.
+# The subset NO autonomy level and NO tier may auto-approve (operator-verified).
 bright_lines:
   - merge_to_main
   - deploy_production
   - rotate_or_read_secret
   - spend_money
+  - delete_or_remove
   - destructive_op
   - modify_policies
-  - create_or_modify_agent
+  - register_permanent_agent
+  - modify_agent
   - modify_skill_or_tool
   - publish_external
   - send_email_external
@@ -73,27 +88,29 @@ bright_lines:
   - target_third_party
 
 network:
-  local_models_bind: "127.0.0.1"   # bright line: local inference never leaves loopback
+  local_models_bind: "127.0.0.1"
   egress: "default-deny; only config/access.yaml allowlisted hosts per domain"
 
-# Substring hints the SubagentStop hook uses to classify a stopping action.
 classification_hints:
-  merge_to_main:          ["git merge", "merge into main", "push origin main", "merge_to_main"]
-  deploy_production:      ["deploy prod", "deploy production", "kubectl apply", "terraform apply", "deploy_production"]
-  rotate_or_read_secret:  ["vault read", "rotate secret", "private_key", "api_key", "n8n credential", "rotate_or_read_secret"]
-  spend_money:            ["stripe", "payout", "wire transfer", "purchase order", "add credit", "spend_money"]
-  destructive_op:         ["drop table", "truncate ", "delete from", "rm -rf", "force push", "destructive_op"]
-  modify_policies:        ["config/policies.yaml", "config/models.yaml", ".claude/settings.json", "config/access.yaml", "modify_policies"]
-  create_or_modify_agent: ["config/agents.yaml", "config/agents_extra.yaml", "config/agent_rubric.yaml", "new agent", "hire agent", "create_or_modify_agent"]
-  modify_skill_or_tool:   [".claude/skills", "skills/", "brand.ts", "new tool", "modify_skill_or_tool"]
-  publish_external:       ["tweet", "post to x", "publish to instagram", "tiktok publish", "app store submit", "go live", "publish_external"]
-  send_email_external:    ["send campaign", "brevo send", "send outreach", "send newsletter", "send_email_external"]
-  access_customer_pii:    ["customer pii", "select pii", "export users", "stripe customer", "access_customer_pii"]
-  target_third_party:     ["nmap ", "exploit target", "scan competitor", "target_third_party"]
+  merge_to_main:            ["git merge", "merge into main", "push origin main", "merge_to_main"]
+  deploy_production:        ["deploy prod", "deploy production", "kubectl apply", "terraform apply"]
+  rotate_or_read_secret:    ["vault read", "rotate secret", "private_key", "api_key", "n8n credential"]
+  spend_money:              ["stripe", "payout", "wire transfer", "purchase order", "add credit"]
+  delete_or_remove:         ["delete", "remove", "rm ", "drop ", "deprovision", "uninstall", "revoke", "delete_or_remove"]
+  destructive_op:           ["drop table", "truncate ", "delete from", "rm -rf", "force push"]
+  modify_policies:          ["config/policies.yaml", "config/models.yaml", ".claude/settings.json", "config/access.yaml"]
+  register_permanent_agent: ["config/agents.yaml", "config/agents_extra.yaml", "config/agent_rubric.yaml", "register agent", "permanent agent", "hire agent"]
+  modify_agent:             ["re-scope agent", "change agent", "modify_agent"]
+  create_ephemeral_agent:   ["ephemeral agent", "quick agent", "spin up agent", "temporary agent", "spin-agent"]
+  modify_skill_or_tool:     [".claude/skills", "skills/", "brand.ts", "new tool"]
+  publish_external:         ["tweet", "post to x", "publish to instagram", "tiktok publish", "app store submit", "go live"]
+  send_email_external:      ["send campaign", "brevo send", "send outreach", "send newsletter"]
+  access_customer_pii:      ["customer pii", "select pii", "export users", "stripe customer"]
+  target_third_party:       ["nmap ", "exploit target", "scan competitor"]
 
 enforcement:
   hook: ".claude/hooks/subagent_stop.py"
-  on_bright_line: "BLOCK the stop; require explicit operator approval; surface to the operator."
-  on_executive_gate: "Require the agent's executive (reports_to) to approve before the action counts as done."
-  on_reviewer_gate: "Require the agent's assigned reviewer (different model) to pass."
-  activity_log: ".claude/hooks/audit_log.py writes every action to logs/activity/ (per-agent) - viewable remotely (docs/18)."
+  on_bright_line: "BLOCK the stop; require operator verification via Telegram; surface to the operator."
+  on_executive_gate: "Require the agent's executive (reports_to) to approve."
+  on_reviewer_gate: "Require the assigned reviewer (different model) to pass."
+  activity_log: "audit_log.py writes every action to logs/activity/<agent>.jsonl - viewable remotely (docs/18)."
