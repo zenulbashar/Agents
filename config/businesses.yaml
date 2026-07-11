@@ -1,0 +1,59 @@
+# =============================================================================
+# Foundry — BUSINESSES the agent company operates
+# =============================================================================
+# The three businesses this suite runs, each with scope, brands, allowed marketing
+# channels (from the verified July-2026 brief), and the review-mode default.
+# The marketing subsystem that executes this lives in marketing/. See docs/16.
+# =============================================================================
+
+version: 1
+review_mode_default: true        # nothing unreviewed reaches a brand account (brief)
+
+businesses:
+
+  prompt2eat:
+    name: "prompt2eat"
+    what: "Online-ordering platform for Australian hospitality venues; flat-fee alternative to commission delivery apps. AI ordering concierge is the flagship feature."
+    priority: primary            # market prompt2eat accounts first (brief)
+    domain_access: prompt2eat
+    brand_voice: "marketing/content/brand-voice.md"
+    pricing_locked: { pro: "AUD $79/mo", scale: "AUD $199/mo", trial: "1-month free at Scale", annual: "-20%" }
+    channels:
+      x:         { cadence: "2/day link-free + 1 link post/week", rule: "NO URLs by default ($0.015 vs $0.20/post); link in bio" }
+      instagram: { cadence: "1/day", rule: "JPEG at a public URL; <=100 API posts/24h" }
+      tiktok:    { cadence: "2/week", rule: "Phase 1 = draft/inbox mode (no audit); finish in-app" }
+      newsletter:{ cadence: "weekly Monday", provider: brevo }
+      outreach:  { cadence: "<=10/weekday", rule: "Spam Act 2003 - personalised, role-relevant, published business addresses only" }
+    guardrails: "marketing/content/guardrails.md (verbatim in every generation prompt)"
+
+  roster:
+    name: "Roster"
+    what: "Rostering tool. Piggyback marketing only until Wave 3 willingness-to-pay is validated (locked principle)."
+    priority: piggyback
+    domain_access: roster
+    channels:
+      newsletter: { rule: "one Roster section per prompt2eat newsletter" }
+      cross_post: { rule: "occasional, where natural" }
+    non_goals:
+      - "Never claim award interpretation, payroll, or compliance features (out of scope)."
+      - "No paid-feature promises before Wave 3 pricing is validated."
+
+  zaleit:
+    name: "Zale IT"
+    what: "Parent business; already runs a Brevo weekly email and Cloudflare/Restic/R2 infra."
+    priority: parent
+    domain_access: zaleit
+    constraints:
+      - "Shares the Brevo 300/day cap if the same account - never schedule everything Monday."
+      - "Separate DKIM/SPF for prompt2eat sending domain so outreach can't damage mail.zaleit.com.au reputation."
+      - "Legal name + ABN + postal address + unsubscribe in every commercial email footer (Spam Act)."
+
+# ---- Cross-business marketing facts (verified July 2026; see marketing/README) --
+marketing_facts:
+  x_api: "Free tier discontinued for new devs 6 Feb 2026; pay-per-use $0.015/post, $0.20 if it contains a URL. Check for a grandfathered pre-Feb-2026 account."
+  instagram: "Professional account + 60-day long-lived token (WF4 refreshes monthly)."
+  tiktok: "Content Posting API free; unaudited clients are draft-only (Phase 1). Public auto-post needs TikTok's compliance audit (Phase 2)."
+  brevo: "Free 300 emails/day shared across marketing + transactional; no rollover."
+  email_law: "Australia: Spam Act 2003 (ACMA), not CAN-SPAM/GDPR. Consent, sender ID (ABN), functional unsubscribe honoured in 5 business days."
+  ai_endpoint: "OpenAI-compatible base URL: Ollama local (free) today; OpenRouter/Anthropic by config change (no code change)."
+  cost: "~$0/month except X (~under $3/mo at cadence)."
