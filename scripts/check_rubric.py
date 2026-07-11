@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Structural check of generated subagents + eval sets against the Strong Agent
-Rubric. Run after `make agents` (the Makefile does this automatically). Exits
-nonzero if any agent fails, so it can gate CI.
-"""
+Rubric + governance. Run after `make agents`. Exits nonzero if any agent fails."""
 import sys
 from pathlib import Path
 
@@ -17,16 +15,24 @@ EVALS = ROOT / "evals"
 
 REQUIRED_SECTIONS = [
     "## Mission", "## Responsibilities", "## Inputs", "## Outputs",
-    "## Decision authority", "## Escalation path", "## Non-goals",
-    "## Tools & capabilities", "## Memory access", "## Model",
-    "## Reviewer", "## Evaluation", "## Example tasks",
+    "## Decision authority", "## Escalation path", "## Chain of command",
+    "## Non-goals", "## Tools & capabilities", "## Containment",
+    "## Memory access", "## Brain & continuous learning", "## Model",
+    "## Reviewer", "## Evaluation", "## Observability",
 ]
 FRONTMATTER = ["name:", "description:", "tools:", "model:"]
 
 
 def agent_keys():
+    keys = []
     with (ROOT / "config" / "agents.yaml").open() as f:
-        return list(yaml.safe_load(f)["agents"].keys())
+        keys += list(yaml.safe_load(f)["agents"].keys())
+    extra = ROOT / "config" / "agents_extra.yaml"
+    if extra.exists():
+        with extra.open() as f:
+            ex = yaml.safe_load(f) or {}
+        keys += list((ex.get("agents") or {}).keys())
+    return keys
 
 
 def check_md(key):
@@ -37,7 +43,7 @@ def check_md(key):
     errs = []
     if not text.lstrip().startswith("---"):
         errs.append("missing YAML frontmatter")
-    head = text[:500]
+    head = text[:600]
     for fm in FRONTMATTER:
         if fm not in head:
             errs.append("frontmatter missing " + fm)
@@ -69,8 +75,8 @@ def check_evals(key):
 def main():
     keys = agent_keys()
     failed = 0
-    print("Rubric structural check (" + str(len(keys)) + " agents)")
-    print("-" * 64)
+    print("Rubric + governance structural check (" + str(len(keys)) + " agents)")
+    print("-" * 66)
     for key in keys:
         errs = check_md(key) + check_evals(key)
         status = "PASS" if not errs else "FAIL"
@@ -79,8 +85,8 @@ def main():
         print(f"{key:26s} {status}")
         for e in errs:
             print("     - " + e)
-    print("-" * 64)
-    print(f"{len(keys) - failed}/{len(keys)} agents pass the structural rubric check.")
+    print("-" * 66)
+    print(f"{len(keys) - failed}/{len(keys)} agents pass the structural check.")
     return 1 if failed else 0
 
 

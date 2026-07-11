@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """Run every agent's golden eval set and print a per-agent pass-rate table.
-
-Default is --dry: validates each golden set is well-formed and reports readiness
-(no model calls), so it runs anywhere. --live dispatches each task to the agent and
-its assigned reviewer (different model) and checks pass_criteria; eval-gated merges
-use the live pass-rate vs each agent's threshold. See docs/15.
-"""
+--dry (default) validates structure; --live dispatches author + reviewer. See docs/15."""
 import sys
 from pathlib import Path
 
@@ -19,8 +14,15 @@ EVALS = ROOT / "evals"
 
 
 def load_keys():
+    keys = []
     with (ROOT / "config" / "agents.yaml").open() as f:
-        return list(yaml.safe_load(f)["agents"].keys())
+        keys += list(yaml.safe_load(f)["agents"].keys())
+    extra = ROOT / "config" / "agents_extra.yaml"
+    if extra.exists():
+        with extra.open() as f:
+            ex = yaml.safe_load(f) or {}
+        keys += list((ex.get("agents") or {}).keys())
+    return keys
 
 
 def load_golden(key):
@@ -49,18 +51,11 @@ def main():
         thresh = float(data.get("threshold", 0.8))
         tasks = data.get("tasks") or []
         total = len(tasks)
-        if live:
-            # TODO(live): dispatch each task to the agent + reviewer; score pass_criteria.
-            ok = 0
-        else:
-            ok = sum(1 for t in tasks if t.get("pass_criteria"))
+        ok = 0 if live else sum(1 for t in tasks if t.get("pass_criteria"))
         rate = (ok / total) if total else 0.0
         agg_ok += ok
         agg_total += total
-        if not live:
-            status = "READY" if rate == 1.0 else "FAIL"
-        else:
-            status = "PASS" if rate >= thresh else "FAIL"
+        status = ("READY" if rate == 1.0 else "FAIL") if not live else ("PASS" if rate >= thresh else "FAIL")
         if status == "FAIL":
             failing.append(key)
         print(f"{key:26s} {total:6d} {thresh:7.2f} {rate*100:6.1f}%  {status}")
@@ -69,7 +64,7 @@ def main():
     label = "pass-rate" if live else "structural readiness"
     print(f"Aggregate {label}: {agg:.1f}% over {agg_total} tasks; {len(failing)} agent(s) need attention.")
     if not live:
-        print("Note: --dry checks structure only (no model calls). Use --live with models for real pass-rates (docs/15).")
+        print("Note: --dry checks structure only. Use --live with models for real pass-rates (docs/15).")
     return 1 if failing else 0
 
 

@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-"""Generate the gstack-style skills/ layer.
-
-Emits one slash command per Foundry agent (skills/agents/<key>.md) that delegates
-to the agent's subagent with the Strong Agent Rubric guardrails baked in (reviewer
-on a different model, eval gate, bright lines). With --install, syncs skills/ into
-.claude/commands/foundry/ so they become /foundry:<area>:<name> slash commands.
-
-Reads config/agents.yaml + config/agent_rubric.yaml. See skills/README.md, docs/15.
+"""Generate the gstack-style skills/ layer (one slash command per agent, delegating
+to its subagent with rubric + chain-of-command guardrails). --install syncs into
+.claude/commands/foundry/. Reads config/agents.yaml (+ agents_extra.yaml) + rubric.
 """
 import shutil
 import sys
@@ -23,21 +18,19 @@ AGENTS_OUT = SKILLS / "agents"
 COMMANDS = ROOT / ".claude" / "commands" / "foundry"
 NL = chr(10)
 
-# Reviewer runs a DIFFERENT model than the author (rubric #10); mirrors
-# config/models.yaml + scripts/generate_agents.py.
 REVIEWER_TIER_FOR_AUTHOR = {
-    "local-small": "cloud-reasoning",
-    "local-mid": "cloud-frontier",
-    "local-large": "cloud-frontier",
-    "cloud-bulk": "cloud-frontier",
-    "cloud-reasoning": "cloud-frontier",
-    "cloud-frontier": "cloud-frontier-alt",
+    "local-small": "cloud-reasoning", "local-mid": "cloud-frontier",
+    "local-large": "cloud-frontier", "cloud-bulk": "cloud-frontier",
+    "cloud-reasoning": "cloud-frontier", "cloud-frontier": "cloud-frontier-alt",
     "cloud-frontier-alt": "cloud-frontier",
 }
 
 
 def load(name):
-    with (ROOT / "config" / name).open() as f:
+    p = ROOT / "config" / name
+    if not p.exists():
+        return {}
+    with p.open() as f:
         return yaml.safe_load(f) or {}
 
 
@@ -65,27 +58,31 @@ Engage the **{a['name']}** (`{key}` subagent, Foundry {dept}) on:
 $ARGUMENTS
 
 Operating rules:
-- Use the `{key}` subagent to do the work; stay within its decision authority and non-goals.
-- BRIGHT LINES (config/policies.yaml): never merge to main, deploy to production, read or
-  rotate a secret, spend money, run a destructive op, modify policies, or publish externally
-  without explicit human approval - STOP and ask the operator.
-- Output is not 'done' until reviewed by **{by}** on a DIFFERENT model (**{rev_model}**);
-  critical gate: {gate}.
-- Validate the result against `evals/{key}/golden.yaml` (threshold {thr}).
+- Use the `{key}` subagent; stay within its decision authority and non-goals.
+- ASK BEFORE ACTING: propose side-effecting work to its executive (**{a['reports_to']}**) and get
+  approval before acting. Reads/drafts are free. When in doubt, consult `brain` + the vault.
+- BRIGHT LINES (config/policies.yaml): never merge to main, deploy to production, read/rotate a
+  secret, spend money, run a destructive op, modify policies, create/modify an agent or skill, or
+  publish/email externally without explicit operator approval - STOP and ask.
+- Contained: jailed to ~/foundry; egress default-deny (config/access.yaml).
+- Not 'done' until reviewed by **{by}** on a DIFFERENT model (**{rev_model}**); gate: {gate}.
+  Validate against `evals/{key}/golden.yaml` (threshold {thr}).
 """
 
 
 def main():
     agents = load("agents.yaml")
-    rub = load("agent_rubric.yaml")
+    extra = load("agents_extra.yaml")
+    agents.setdefault("agents", {}).update(extra.get("agents", {}) or {})
     depts = agents["departments"]
+    rub = load("agent_rubric.yaml")
+    rub.update(extra.get("rubric", {}) or {})
     AGENTS_OUT.mkdir(parents=True, exist_ok=True)
     n = 0
     for key, a in agents["agents"].items():
         (AGENTS_OUT / (key + ".md")).write_text(skill_for(key, a, rub, depts))
         n += 1
     print("Wrote " + str(n) + " agent skills -> skills/agents/")
-
     if "--install" in sys.argv:
         installed = 0
         for area in ["agents", "workflow", "power"]:
