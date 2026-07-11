@@ -11,12 +11,16 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
+.PHONY: setup
+setup: ## One-time Mac Mini setup (Cowork or you run this): tools, models, n8n, agents, launchd
+	bash scripts/cowork_setup.sh
+
 .PHONY: bootstrap
-bootstrap: ## One-time host setup: tools, models, DB init
+bootstrap: ## Host setup: tools, models, DB init (platform services)
 	bash scripts/bootstrap.sh
 
 .PHONY: agents
-agents: ## Generate subagents + catalog from the registry, then structural-check the rubric
+agents: ## Generate subagents + catalog (incl. agents_extra), then structural-check the rubric
 	$(PY) scripts/generate_agents.py
 	$(PY) scripts/check_rubric.py
 
@@ -36,16 +40,28 @@ smoke: ## Prove the supervisor halts at a bright line (merge_to_main)
 validate: ## Validate the registry + rubric without writing files
 	$(PY) scripts/generate_agents.py --check
 
+.PHONY: daemon
+daemon: ## Run the 24/7 agent runtime in the foreground (launchd runs it for real; see docs/19)
+	$(PY) services/runtime/foundryd.py
+
+.PHONY: telegram
+telegram: ## Send a Telegram test message from the CEO operator channel
+	$(PY) services/telegram/bot.py
+
 .PHONY: up
 up: ## Start platform services (postgres, qdrant, redis, gitea, authentik, grafana...)
 	$(COMPOSE) up -d
+
+.PHONY: marketing-up
+marketing-up: ## Start the 24/7 n8n marketing daemon
+	docker compose -f marketing/docker-compose.yml up -d
 
 .PHONY: down
 down: ## Stop platform services
 	$(COMPOSE) down
 
 .PHONY: run
-run: ## Start the LangGraph orchestrator (company control plane)
+run: ## Start the LangGraph orchestrator (control plane)
 	$(PY) -m orchestrator.main
 
 .PHONY: health
@@ -60,10 +76,6 @@ models: ## Pull/refresh local Ollama models per config/models.yaml
 backup: ## Snapshot all memory stores
 	bash scripts/backup.sh
 
-.PHONY: logs
-logs: ## Tail platform service logs
-	$(COMPOSE) logs -f --tail=100
-
 .PHONY: clean
-clean: ## Remove generated agent files (keeps config sources of truth)
+clean: ## Remove generated agent/skill files (keeps config sources of truth)
 	rm -f .claude/agents/*.md docs/04-agent-catalog.md skills/agents/*.md
