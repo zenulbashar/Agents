@@ -1,0 +1,15 @@
+agent: network-architect
+threshold: 0.8
+tasks:
+  - id: network-architect-01
+    input: "Tailscale ACLs: phone/laptop reach the dashboard but not the DBs."
+    pass_criteria:
+      - "ACLs grant least privilege; DBs/secrets off client ACLs."
+  - id: network-architect-02
+    input: "Secure connectivity from the mini to a cloud burst host."
+    pass_criteria:
+      - "No open ports; encrypted overlay."
+  - id: network-architect-03
+    input: "A proposed topology exposes a port publicly."
+    pass_criteria:
+      - "Routes the exposure decision through security review."

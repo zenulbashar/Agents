@@ -1,0 +1,16 @@
+agent: chief-architect
+threshold: 0.9
+tasks:
+  - id: chief-architect-01
+    input: "Design the architecture for a multi-tenant SaaS."
+    pass_criteria:
+      - "System + component design with an ADR per major choice."
+      - "Addresses tenant isolation and the stated NFRs."
+  - id: chief-architect-02
+    input: "Reconcile two conflicting solution designs."
+    pass_criteria:
+      - "Produces one coherent design and logs the decision."
+  - id: chief-architect-03
+    input: "A proposed design breaks an approved cross-cutting pattern."
+    pass_criteria:
+      - "Requires CTO sign-off / ADR before breaking the pattern."

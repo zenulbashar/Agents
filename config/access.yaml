@@ -1,0 +1,85 @@
+# =============================================================================
+# Foundry — ACCESS & CONTAINMENT MATRIX (default-deny)
+# =============================================================================
+# The operator requirement: agents run in a CONTAINED environment and may touch
+# ONLY what is granted here - never the whole Mac Mini. Everything not listed is
+# denied. Enforced by: Docker containers + macOS sandbox-exec + a jailed Cowork
+# working directory + a network egress allowlist + per-agent tool grants +
+# .claude/settings.json permission denies. See docs/17-containment-and-access.md.
+# =============================================================================
+
+version: 1
+default: deny        # anything not explicitly granted below is denied
+
+# ---- Global jails (apply to every agent) ------------------------------------
+global:
+  filesystem:
+    allow_root: "~/foundry"          # the ONLY tree agents may read/write
+    workspaces: "~/foundry/workspaces/<domain>/"   # each domain gets its own jail
+    vault: "~/foundry/vault/"        # the shared Obsidian brain (see below)
+    deny_always:
+      - "~/.ssh" 
+      - "~/.aws"
+      - "~/Library/Keychains"
+      - "~/Documents"
+      - "~/Desktop"
+      - "/ (the rest of the Mac)"
+  network:
+    egress: default-deny
+    always_allow: ["127.0.0.1", "localhost"]   # local models/services only by default
+  secrets:
+    store: "n8n credential store + macOS Keychain (via a broker); NEVER on disk, NEVER in Cowork files, NEVER in the vault"
+    read: human_gate                 # reading/rotating a secret is a bright line
+  runtime:
+    daemon_work: "Docker containers (n8n, services) - the only thing that runs 24/7"
+    supervised_work: "Claude Cowork, jailed to ~/foundry, holds NO keys, writes only to its workspace + the Google Sheet queue"
+    sandbox: "code execution via container or macOS sandbox-exec profiles; CPU/mem/time limited"
+
+# ---- Per-domain grants (least privilege) ------------------------------------
+# Each agent belongs to one or more domains; it inherits that domain's grants.
+domains:
+
+  platform:                # the company OS itself (engineering/security/infra agents)
+    fs_allow: ["~/foundry (repo)", "~/foundry/workspaces/platform"]
+    egress_allow: ["127.0.0.1", "api.anthropic.com", "registry.ollama.ai", "github.com", "objects.githubusercontent.com"]
+    credentials: ["gitea_token (container only)"]
+
+  prompt2eat:              # the ordering tool business
+    fs_allow: ["~/foundry/workspaces/prompt2eat"]
+    egress_allow: ["127.0.0.1", "api.anthropic.com", "order.zaleit.com.au", "prompt2eat.com", "media.prompt2eat.com"]
+    credentials: []        # posting/keys live in n8n only, human-gated
+    notes: "Stripe/customer data is PII - access_customer_pii is a human gate."
+
+  roster:                  # the rostering tool business (piggyback until Wave 3 pricing validated)
+    fs_allow: ["~/foundry/workspaces/roster"]
+    egress_allow: ["127.0.0.1", "api.anthropic.com"]
+    credentials: []
+    notes: "No paid-feature promises; never claim award/payroll/compliance features."
+
+  zaleit:                  # the Zale IT parent business
+    fs_allow: ["~/foundry/workspaces/zaleit"]
+    egress_allow: ["127.0.0.1", "api.anthropic.com", "zaleit.com.au"]
+    credentials: []
+    notes: "Shares the Brevo 300/day cap - never let outreach threaten mail.zaleit.com.au reputation."
+
+  marketing:               # the marketing subsystem (see marketing/ + docs)
+    fs_allow: ["~/foundry/workspaces/marketing", "~/marketing-automation/content"]
+    egress_allow: ["127.0.0.1", "api.anthropic.com", "sheets.googleapis.com", "openrouter.ai"]
+    credentials: []        # Cowork writes ONLY the Google Sheet queue; X/IG/TikTok/Brevo keys live in n8n
+    review_mode: true      # nothing unreviewed reaches a brand account (brief default)
+
+  brain:                   # the knowledge/learning meta-agents
+    fs_allow: ["~/foundry/vault", "~/foundry/workspaces/brain"]
+    egress_allow: ["127.0.0.1", "api.anthropic.com"]
+    research_egress_allow: ["anthropic.com/news", "docs.claude.com", "github.com", "arxiv.org"]  # for industry watch (read-only)
+    credentials: []
+    notes: "Learning is read + write-to-vault only; proposing a new skill/agent is a human gate."
+
+# ---- How this is enforced (defense in depth) --------------------------------
+enforcement:
+  - "Per-agent tool allowlist (generated from config/agents.yaml) - agents only hold the tools their mission needs."
+  - "PreToolUse hook (approval_gate.py) blocks gated tool calls; egress to non-allowlisted hosts is ASKed."
+  - "Docker network policies + host firewall (Firewall agent) enforce the egress allowlist for daemon work."
+  - "Cowork runs jailed to ~/foundry and holds no credentials (brief design)."
+  - ".claude/settings.json deny rules block ~/.ssh, ~/.aws, ./.env, secrets/**."
+  - "macOS sandbox-exec profiles wrap code execution; containers cap CPU/mem/time."

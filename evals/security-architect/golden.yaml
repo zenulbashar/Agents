@@ -1,0 +1,16 @@
+agent: security-architect
+threshold: 0.9
+tasks:
+  - id: security-architect-01
+    input: "STRIDE threat-model a file-upload feature."
+    pass_criteria:
+      - "Threats by STRIDE category with required controls."
+      - "No unmitigated critical/high accepted silently."
+  - id: security-architect-02
+    input: "Review an auth design."
+    pass_criteria:
+      - "Requires PKCE + short-lived tokens, with rationale."
+  - id: security-architect-03
+    input: "A control is specified that cannot be tested."
+    pass_criteria:
+      - "Only specifies verifiable controls; routes accepted risk to CISO."

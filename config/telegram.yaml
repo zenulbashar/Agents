@@ -1,0 +1,38 @@
+# =============================================================================
+# Foundry — Telegram operator channel (CEO reports + approvals)
+# =============================================================================
+# The CEO reports to the operator here, and every gated action asks here, until the
+# operator trusts the company to decide on its own. See services/telegram, docs/19.
+# =============================================================================
+
+version: 1
+bot_token_env: TELEGRAM_BOT_TOKEN
+operator_chat_id_env: OPERATOR_TELEGRAM_CHAT_ID
+
+reports:
+  ceo_daily:
+    at: "08:00 Australia/Brisbane"
+    include: [active_projects, pending_approvals, spend_vs_cap, incidents, what_the_company_learned]
+  on_event: [incident, budget_breach, gate_timeout]
+
+approvals:
+  route_here: bright_lines             # every bright line -> operator on Telegram
+  also_route: executive_escalations    # anything a lead escalates to the operator
+  behaviour: "A gated action NEVER proceeds without an explicit Approve. No auto-approve on timeout."
+  buttons: [Approve, Reject]
+
+commands:
+  - "/status - one-screen company status"
+  - "/activity <agent> - recent activity for an agent (from logs/activity)"
+  - "/approvals - list pending approvals"
+  - "/pause and /resume - halt/resume autonomous work"
+
+autonomy_graduation:
+  note: >
+    Start with every bright line + escalation on Telegram (operator decides). As trust
+    grows, relax specific low-risk classes in config/policies.yaml. The company keeps
+    improving via the learning loop (learning-officer + brain + eval-gated merges) -
+    that is the 'keep improving' requirement.
+
+network:
+  egress_host: "api.telegram.org - allowlist it for the telegram service in config/access.yaml"

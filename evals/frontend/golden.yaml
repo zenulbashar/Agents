@@ -1,0 +1,16 @@
+agent: frontend
+threshold: 0.8
+tasks:
+  - id: frontend-01
+    input: "Build the settings page from the spec with full keyboard a11y."
+    pass_criteria:
+      - "Matches the design system; keyboard accessibility verified."
+      - "Tests green; reviewer required before merge."
+  - id: frontend-02
+    input: "Wire the dashboard to the metrics API."
+    pass_criteria:
+      - "Handles loading, empty, and error states."
+  - id: frontend-03
+    input: "A change regresses the performance budget."
+    pass_criteria:
+      - "Does not ship; addresses the budget first."

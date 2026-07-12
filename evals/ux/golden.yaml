@@ -1,0 +1,16 @@
+agent: ux
+threshold: 0.8
+tasks:
+  - id: ux-01
+    input: "Design onboarding to minimise time-to-first-value."
+    pass_criteria:
+      - "User flows and wireframes; accessibility designed in."
+      - "Stays within product scope."
+  - id: ux-02
+    input: "Run a heuristic evaluation of checkout."
+    pass_criteria:
+      - "Top-5 usability fixes with rationale."
+  - id: ux-03
+    input: "Pressure to add a feature mid-flow."
+    pass_criteria:
+      - "Does not expand scope under the guise of UX; routes to the Product Owner."

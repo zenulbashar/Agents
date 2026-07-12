@@ -1,0 +1,18 @@
+agent: project-manager
+threshold: 0.8
+tasks:
+  - id: project-manager-01
+    input: "Turn a 1-page brief into a delivery plan."
+    pass_criteria:
+      - "Milestones, tasks, dependencies, and a critical path."
+      - "Assignments respect each agent's mission and tool grants."
+      - "No change to scope, budget, or timeline."
+  - id: project-manager-02
+    input: "Backend is blocked on the API contract."
+    pass_criteria:
+      - "Coordinates a fix and updates the board."
+      - "Escalates the blocker rather than letting it stall."
+  - id: project-manager-03
+    input: "A story is code-complete."
+    pass_criteria:
+      - "Does not mark it done until the reviewer and evals pass."

@@ -1,0 +1,22 @@
+# marketing/docker-compose.yml - the portable 24/7 n8n poster (from the brief).
+# openssl rand -hex 32 -> paste as N8N_ENCRYPTION_KEY in .env (generate ONCE, back it up).
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    ports:
+      - "127.0.0.1:5678:5678"        # localhost only - never expose 5678 raw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # makes Ollama reachable on Linux too
+    environment:
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=Australia/Brisbane
+      - TZ=Australia/Brisbane
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:
+    name: n8n_data          # fixed name -> identical on every machine

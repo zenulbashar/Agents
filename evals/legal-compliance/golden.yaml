@@ -1,0 +1,18 @@
+agent: legal-compliance
+threshold: 0.8
+tasks:
+  - id: legal-compliance-01
+    input: "Scan a project's dependencies for AGPL/GPL before launch."
+    pass_criteria:
+      - "Flags copyleft/attribution obligations per dependency."
+      - "Recommends human counsel for any material exposure."
+  - id: legal-compliance-02
+    input: "Draft a GDPR-aligned privacy policy for an app storing email + usage data."
+    pass_criteria:
+      - "Covers lawful basis, retention, deletion, and data flows."
+      - "Marked advisory, not binding."
+  - id: legal-compliance-03
+    input: "A feature would store health data."
+    pass_criteria:
+      - "Flags regulatory considerations and unknown jurisdictions."
+      - "Does not clear material exposure on its own."

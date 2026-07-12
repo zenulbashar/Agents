@@ -1,0 +1,90 @@
+# =============================================================================
+# Foundry — MEMORY ARCHITECTURE
+# =============================================================================
+# Defines the five memory classes, the store behind each, retention, and how
+# RAG retrieval is assembled. See docs/06-memory-system.md.
+# =============================================================================
+
+classes:
+
+  working:
+    description: "Per-task / per-session scratchpad and short-term context."
+    store: redis
+    scope: "agent + task"
+    ttl: "24h (or task completion)"
+    examples: ["current plan", "intermediate results", "tool outputs in-flight"]
+
+  semantic:
+    description: "General, cross-project knowledge for RAG (docs, research, how-tos)."
+    store: qdrant
+    collection: knowledge
+    embed: nomic-embed-text
+    scope: "company-wide"
+    ttl: "persistent (with staleness review by Documentation agent)"
+
+  project:
+    description: "Everything about one project: brief, requirements, decisions, status, tickets."
+    store: postgres            # structured rows
+    vectors: qdrant            # collection per project for semantic recall
+    scope: "project"
+    ttl: "life of project + archive"
+
+  code:
+    description: "The codebase as memory: repos, symbols, and embeddings of code/docs."
+    store: git                 # source of truth
+    vectors: qdrant            # collection: code-<repo> (chunked + embedded)
+    index: "tree-sitter symbols + file/path graph"
+    scope: "repo"
+    ttl: "persistent; re-indexed on merge"
+
+  decision:
+    description: "Append-only decision log / ADRs — WHY things are the way they are."
+    store: postgres            # immutable table (append-only, hash-chained)
+    vectors: qdrant            # for 'have we decided this before?' recall
+    scope: "company + project"
+    ttl: "permanent (never deleted; supersede, don't erase)"
+
+  customer:
+    description: "Accounts, tickets, feedback, voice-of-customer."
+    store: postgres
+    vectors: qdrant
+    scope: "customer/account"
+    ttl: "per retention policy + privacy law (see Legal/Compliance)"
+    pii: true                  # access is a HARD GATE; encrypted at rest; minimised
+
+  org:
+    description: "Org chart, policies, budgets, SLAs, autonomy config."
+    store: postgres
+    scope: "company-wide"
+    ttl: "persistent (versioned)"
+
+# ---- Knowledge graph (optional, Phase 3+) -----------------------------------
+graph:
+  enabled: false
+  store: neo4j
+  use: "Relationships across entities (project<->dependency<->CVE<->decision<->owner)."
+
+# ---- RAG retrieval assembly -------------------------------------------------
+rag:
+  pipeline:
+    - "Classify the query -> which memory classes are relevant."
+    - "Hybrid search per class: BM25/keyword (Postgres FTS) + vector (Qdrant)."
+    - "Rerank merged hits (cross-encoder or strong-model rerank for high-stakes)."
+    - "Pack a token budget: pinned facts first, then top reranked chunks, with citations."
+    - "Always include the relevant decision-log entries so agents don't re-litigate."
+  defaults:
+    top_k_vector: 12
+    top_k_keyword: 12
+    final_context_chunks: 8
+    always_include: [pinned_project_facts, relevant_ADRs]
+  write_policy:
+    - "Agents write durable facts/decisions, NOT raw chat transcripts."
+    - "Every decision write goes to the append-only decision log with author + rationale."
+    - "Code memory is re-embedded on merge to main (DevOps pipeline hook)."
+
+# ---- Retention & privacy ----------------------------------------------------
+retention:
+  audit_logs: "365d hot in Loki, then cold archive"
+  working_memory: "24h"
+  customer_pii: "minimise; delete on request; honour legal retention"
+  backups: "nightly snapshot of postgres+qdrant+graph; weekly off-box copy; restore-tested"

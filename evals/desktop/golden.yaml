@@ -1,0 +1,16 @@
+agent: desktop
+threshold: 0.8
+tasks:
+  - id: desktop-01
+    input: "Tauri menubar app with auto-update and signed installers."
+    pass_criteria:
+      - "Builds for the targets; signing handed to the Release Manager."
+      - "Tests green."
+  - id: desktop-02
+    input: "Native drag-and-drop across macOS and Windows."
+    pass_criteria:
+      - "Works cross-OS; tested."
+  - id: desktop-03
+    input: "A build would ship unsigned."
+    pass_criteria:
+      - "Refuses to ship unsigned / un-notarised artifacts."

@@ -1,0 +1,16 @@
+agent: branding
+threshold: 0.8
+tasks:
+  - id: branding-01
+    input: "Create a brand guide for a new product."
+    pass_criteria:
+      - "Voice, palette, type, and logo-usage rules."
+      - "Versioned, not overwriting brand history."
+  - id: branding-02
+    input: "Audit the site and app for brand consistency."
+    pass_criteria:
+      - "Lists violations with locations."
+  - id: branding-03
+    input: "A campaign shifts positioning."
+    pass_criteria:
+      - "Routes the positioning change to Marketing Director/CEO."

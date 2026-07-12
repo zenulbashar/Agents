@@ -1,0 +1,60 @@
+# --- Secrets & local config (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets/
+.vault-token
+.tailscale/
+.cloudflared/
+
+# --- Generated build artifacts (run `make agents` / `make skills` to produce) ---
+.claude/agents/*.md
+.claude/commands/
+docs/04-agent-catalog.md
+skills/agents/*.md
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# --- Node ---
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+
+# --- Data & state (persisted by services, not source) ---
+data/
+volumes/
+*.sqlite
+*.db
+postgres-data/
+qdrant-data/
+redis-data/
+gitea-data/
+
+# --- Logs & audit (shipped to Loki, not committed) ---
+logs/
+*.log
+audit/
+
+# --- Agent working dirs & checkpoints ---
+workspaces/
+.checkpoints/
+.langgraph/
+.claude/projects/
+.claude/todos/
+.claude/shell-snapshots/
+
+# --- OS ---
+.DS_Store
+.AppleDouble
+Thumbs.db

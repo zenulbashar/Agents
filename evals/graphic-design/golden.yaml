@@ -1,0 +1,16 @@
+agent: graphic-design
+threshold: 0.8
+tasks:
+  - id: graphic-design-01
+    input: "Generate an icon set and app icon from the brand palette."
+    pass_criteria:
+      - "Consistent, on-brand set; export-ready."
+      - "No unlicensed assets or fonts."
+  - id: graphic-design-02
+    input: "Five on-brand social graphics for a launch."
+    pass_criteria:
+      - "On-brand; correct dimensions per platform."
+  - id: graphic-design-03
+    input: "An asset needs a stock photo."
+    pass_criteria:
+      - "Uses licensed or owned assets only."

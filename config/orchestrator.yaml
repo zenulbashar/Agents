@@ -1,0 +1,85 @@
+# =============================================================================
+# Foundry — ORCHESTRATOR POLICY
+# =============================================================================
+# Drives the LangGraph supervisor: how projects flow, where the human gates are,
+# what each autonomy level may do, and the budgets/circuit-breakers.
+# See docs/05-orchestration.md, docs/09-dev-workflow.md, docs/10-autonomy-levels.md.
+# =============================================================================
+
+autonomy:
+  # Set the live level via FOUNDRY_AUTONOMY_LEVEL (env). Per-project override allowed.
+  default_level: 1
+  levels:
+    0: { name: "Approve everything", auto: [],
+         gate: ["plan","code","merge","deploy","spend","publish","data","secrets"] }
+    1: { name: "Semi-autonomous",
+         auto: ["plan","code","merge:non-main","test"],
+         gate: ["merge:main","deploy","spend>budget","publish","data","secrets"] }
+    2: { name: "Project autonomy (within charter)",
+         auto: ["plan","code","merge","deploy:staging","test","spend<=budget"],
+         gate: ["deploy:prod","publish","spend>budget","data:prod","secrets","legal"] }
+    3: { name: "Near-full (policy-bounded)",
+         auto: ["plan","code","merge","deploy:staging","deploy:prod:low-risk","spend<=budget","publish:low-risk"],
+         gate: ["spend>budget","data:prod:bulk","secrets:new","legal","irreversible","new-project"] }
+
+# ---- Hard gates: ALWAYS require a human, at every level ----------------------
+hard_gates:
+  - production_deploy_to_customers
+  - spending_money_above_cap
+  - publishing_external_content        # social posts, blog go-live, store submission
+  - accessing_or_moving_customer_PII
+  - creating_or_reading_new_secrets
+  - irreversible_data_operations        # drops, deletes, prod migrations
+  - signing_legal_or_financial_commitments
+  - any_action_targeting_third_party_systems
+
+# ---- Project workflow stages (the company's SDLC) ---------------------------
+workflow:
+  stages:
+    - { id: intake,        owner: chief-of-staff,    gate: false }
+    - { id: requirements,  owner: business-analyst,  gate: false, review: product-owner }
+    - { id: architecture,  owner: chief-architect,   gate: false, review: cto }
+    - { id: design,        owner: ux,                gate: false, review: product-owner }
+    - { id: development,   owner: project-manager,   gate: false }   # fans out to engineers
+    - { id: code_review,   owner: code-review,       gate: false }   # blocks merge
+    - { id: security_review,owner: security-architect,gate: false, veto: ciso }
+    - { id: testing,       owner: qa,                gate: false, veto: qa }
+    - { id: deployment,    owner: release-manager,   gate: true,  approver: [cto, ciso] }
+    - { id: monitoring,    owner: devops,            gate: false }
+    - { id: marketing,     owner: marketing-director, gate: true, approver: [operator] }  # publish gate
+  # A stage may loop back (e.g. testing -> development) without re-approval at Level>=1.
+
+# ---- Conflict resolution ----------------------------------------------------
+conflict_resolution:
+  ladder:
+    - "Specialists negotiate via the shared project memory (proposal + counter)."
+    - "Unresolved -> department lead decides."
+    - "Cross-department -> COO mediates."
+    - "Strategy/architecture stalemate -> CEO/CTO decision, logged as an ADR."
+    - "Security has VETO at the security gate (CISO), overridable only by the operator."
+  tie_breakers:
+    product: product-owner
+    technical: cto
+    security: ciso     # veto, not just tie-break
+    money: cfo
+    final: operator
+
+# ---- Budgets & circuit breakers (per project unless noted) ------------------
+budgets:
+  cloud_usd_per_day_env: CLOUD_DAILY_BUDGET_USD
+  max_concurrent_projects: 3            # Mac Mini reality; see docs/14
+  max_concurrent_heavy_models: 1        # one local-large OR a bounded cloud burst at a time
+  task_timeout_minutes: 30              # a single agent task; then checkpoint + escalate
+  max_agent_loop_iterations: 12         # anti-runaway; then escalate to human
+circuit_breakers:
+  - "Repeated failures (>3) on a stage -> pause project, alert operator."
+  - "Cloud budget breach -> stop cloud calls, fall back to local (see models.yaml)."
+  - "Unbounded tool-call growth -> kill task, checkpoint, escalate."
+
+# ---- Communication --------------------------------------------------------
+communication:
+  bus: redis-streams                    # async task/event bus between agents
+  shared_state: postgres + qdrant       # durable project context (not chat logs)
+  human_channel: notify                 # push to operator (Tailscale-reachable UI + mobile)
+  principle: "Agents communicate through durable shared state + typed messages, NOT
+              free-form group chat. Every cross-agent message is a structured artifact."

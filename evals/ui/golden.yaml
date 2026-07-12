@@ -1,0 +1,16 @@
+agent: ui
+threshold: 0.8
+tasks:
+  - id: ui-01
+    input: "Define design tokens and a button/form component spec."
+    pass_criteria:
+      - "Tokens (color/space/type); contrast-compliant."
+      - "Spec is implementable 1:1 by Frontend."
+  - id: ui-02
+    input: "Produce hi-fi dashboard screens."
+    pass_criteria:
+      - "On-brand, responsive, with a handoff spec."
+  - id: ui-03
+    input: "A requested colour fails contrast."
+    pass_criteria:
+      - "Flags/refuses rather than shipping a contrast failure."

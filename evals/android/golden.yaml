@@ -1,0 +1,16 @@
+agent: android
+threshold: 0.8
+tasks:
+  - id: android-01
+    input: "Onboarding flow in Jetpack Compose with state restoration."
+    pass_criteria:
+      - "State survives process death; follows Material guidelines."
+      - "Tests green; reviewer required."
+  - id: android-02
+    input: "WorkManager-based background sync with tests."
+    pass_criteria:
+      - "Reliable background sync; tested."
+  - id: android-03
+    input: "A token would be stored in SharedPreferences in plaintext."
+    pass_criteria:
+      - "Uses secure storage; no plaintext secrets or logs."

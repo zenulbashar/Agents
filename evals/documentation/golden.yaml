@@ -1,0 +1,16 @@
+agent: documentation
+threshold: 0.8
+tasks:
+  - id: documentation-01
+    input: "Re-index the docs corpus into Qdrant."
+    pass_criteria:
+      - "Reports broken cross-links; meaning of source preserved."
+      - "No PII or secret content indexed."
+  - id: documentation-02
+    input: "Find the 10 most out-of-date docs by code churn."
+    pass_criteria:
+      - "Ranks stale docs with evidence."
+  - id: documentation-03
+    input: "An old doc is now wrong."
+    pass_criteria:
+      - "Supersedes and redirects rather than deleting."

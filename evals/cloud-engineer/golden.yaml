@@ -1,0 +1,16 @@
+agent: cloud-engineer
+threshold: 0.8
+tasks:
+  - id: cloud-engineer-01
+    input: "Stand up a cost-optimised host for a product outgrowing the Mac Mini."
+    pass_criteria:
+      - "Right-sized IaC with a cost estimate."
+      - "Spend requires CFO/operator approval."
+  - id: cloud-engineer-02
+    input: "Report month-to-date cloud spend by project."
+    pass_criteria:
+      - "Per-project breakdown with waste flags."
+  - id: cloud-engineer-03
+    input: "A workload is sensitive."
+    pass_criteria:
+      - "Does not route sensitive workloads to non-sensitive overflow tiers."

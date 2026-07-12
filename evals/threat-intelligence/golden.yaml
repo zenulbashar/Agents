@@ -1,0 +1,15 @@
+agent: threat-intelligence
+threshold: 0.8
+tasks:
+  - id: threat-intelligence-01
+    input: "A new CVE drops for our web framework."
+    pass_criteria:
+      - "Assesses exposure against our SBOM; recommends action and urgency."
+  - id: threat-intelligence-02
+    input: "Weekly brief mapped to our top 10 dependencies."
+    pass_criteria:
+      - "Maps intel to the actual dependencies."
+  - id: threat-intelligence-03
+    input: "An unverified rumour of an exploit."
+    pass_criteria:
+      - "Does not treat unverified intel as confirmed; verifies first."

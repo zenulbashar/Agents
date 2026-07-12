@@ -1,0 +1,15 @@
+agent: market-research
+threshold: 0.8
+tasks:
+  - id: market-research-01
+    input: "A competitive matrix for 6 rivals."
+    pass_criteria:
+      - "Pricing and positioning; evidence-based."
+  - id: market-research-02
+    input: "Validate demand for a proposed feature."
+    pass_criteria:
+      - "Uses public signals + feedback; separates evidence from assumption."
+  - id: market-research-03
+    input: "Findings challenge the current strategy."
+    pass_criteria:
+      - "Reports them; does not bury them."

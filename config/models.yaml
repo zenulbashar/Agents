@@ -1,0 +1,113 @@
+# =============================================================================
+# Foundry — MODEL ROUTING POLICY (v2: Strong Agent Rubric tiering + guardrails)
+# =============================================================================
+# Tier KEYS are stable (config/agents.yaml + scripts/generate_agents.py depend on
+# them). Concrete models refresh as releases land. See docs/08 and docs/15.
+# =============================================================================
+
+tiers:
+  local-small:        # utility / cheap: classification, routing, formatting, docs, commit messages
+    purpose: "Utility: classification, routing, formatting, docs, commit messages."
+    provider: ollama
+    model: "qwen3.6:8b"
+    alt: ["llama3.3:8b"]
+    bind: "127.0.0.1"           # BRIGHT LINE: local models never leave loopback
+    cost: free-local
+
+  local-mid:          # local agentic coder: ALL bulk engineering. Zero marginal cost.
+    purpose: "Local agentic coder — all bulk engineering; the volume tier."
+    provider: ollama
+    model: "devstral-small-2"
+    alt: ["qwen3.6:27b"]
+    bind: "127.0.0.1"
+    cost: free-local
+
+  local-large:        # heavier local reasoning when offline / cost-bound
+    purpose: "Heavier local reasoning when offline or cost-bound."
+    provider: ollama
+    model: "qwen3.6:27b"
+    alt: ["llama3.3:70b-instruct-q4_K_M"]
+    bind: "127.0.0.1"
+    cost: free-local
+
+  cloud-bulk:         # NEW: non-sensitive overflow when local is saturated
+    purpose: "Cloud bulk coder for NON-SENSITIVE overflow when local is saturated."
+    provider: openai-compatible
+    model: "glm-5.2"
+    alt: ["deepseek-v4"]
+    sensitive_ok: false        # NEVER route secrets / PII / proprietary core here
+    cost: metered-cheap
+
+  cloud-reasoning:    # strong reasoning / review when it pays off
+    purpose: "Strong reasoning, code review, security analysis when it pays off."
+    provider: anthropic
+    model: "claude-sonnet-4-6"
+    cost: metered
+
+  cloud-frontier:     # Opus-class: architecture, security, final gate, adjudication, hard debugging
+    purpose: "Frontier: architecture, security review, threat modeling, final release gate, hard debugging, adjudication."
+    provider: anthropic
+    model: "claude-opus-4-8"
+    cost: premium-metered
+
+  cloud-frontier-alt: # NEW: different provider for the REVIEWER on critical gates
+    purpose: "Alternate frontier provider for the reviewer on critical gates, to break correlated failure with a Claude author."
+    provider: alt-frontier
+    model: "gpt-frontier"
+    alt: ["gemini-frontier"]
+    cost: premium-metered
+
+embeddings:
+  provider: ollama
+  model: "nomic-embed-text"
+  dim: 768
+  bind: "127.0.0.1"
+
+# ---- Reviewer pairing (rubric #10): reviewer runs a DIFFERENT model than author -
+reviewer_policy:
+  principle: "On critical gates the reviewer runs a different model than the author to break correlated failure."
+  default_reviewer_tier_for_author:
+    local-small:        cloud-reasoning
+    local-mid:          cloud-frontier
+    local-large:        cloud-frontier
+    cloud-bulk:         cloud-frontier
+    cloud-reasoning:    cloud-frontier
+    cloud-frontier:     cloud-frontier-alt   # Claude author -> alt-provider reviewer
+    cloud-frontier-alt: cloud-frontier
+
+# ---- Router policy -----------------------------------------------------------
+router:
+  escalation_triggers:
+    - "self-reported confidence < 0.6"
+    - "task tagged high-risk (security review, prod arch, payments, adjudication)"
+    - "2 consecutive tool/test failures on the same step"
+    - "eval pass-rate below the agent's threshold on the change"
+    - "code-review verdict = request-changes twice on the same PR"
+    - "operator explicitly requests a stronger model"
+  overflow:
+    - "When local inference is saturated (max_concurrent_local_inference reached), NON-SENSITIVE coding overflow -> cloud-bulk; sensitive work waits for a local slot."
+  offline_mode:
+    cloud-reasoning: local-large
+    cloud-frontier: local-large
+    cloud-bulk: local-mid
+
+# ---- Cost guardrails (autonomous work bills at real API rates) ---------------
+cost_guardrails:
+  monthly_hard_cap_usd: 1500          # hard ceiling; on breach stop cloud, go local-only, alert CFO + operator
+  daily_usd_env: CLOUD_DAILY_BUDGET_USD
+  max_concurrent_local_inference: 2   # MAX_CONCURRENT_LOCAL_INFERENCE
+  prompt_caching:
+    keep_fixed_prefix_stable: true    # stable system prompt + tool defs + CLAUDE.md so caching absorbs the prefix
+    note: "Do not reorder/rewrite the fixed prefix between turns; put variable content last."
+  routing_bias: "Push every non-frontier-worthy task to local (zero marginal cost). Frontier only for the rubric's frontier work."
+  on_breach: "Halt new cloud calls; finish in-flight; fall back to local; alert CFO + operator."
+
+# ---- Bright lines (mirrored in config/policies.yaml; no tier bypasses) -------
+bright_lines:
+  - merge_to_main
+  - deploy_production
+  - rotate_or_read_secret
+  - spend_money
+  - destructive_op
+  - modify_policies
+network_bright_line: "Local models bind to 127.0.0.1 only; no local model traffic leaves the host."
