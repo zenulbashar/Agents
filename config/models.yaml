@@ -5,6 +5,15 @@
 # them). Concrete models refresh as releases land. See docs/08 and docs/15.
 # =============================================================================
 
+# ---- Runtime mode -----------------------------------------------------------
+# local-only (default): the 24/7 runtime (foundryd + n8n + Ollama) NEVER calls a
+# cloud tier. Every cloud-* tier resolves to its router.offline_mode local mapping,
+# and the reviewer runs a DIFFERENT LOCAL family. $0 marginal cost.
+# Switch to "hybrid" (add an API key + raise CLOUD_DAILY_BUDGET_USD) only to buy
+# cloud frontier help on the hardest gates. The hard $0 guarantee is: blank cloud
+# keys in .env + CLOUD_DAILY_BUDGET_USD=0 (no key/budget -> no cloud call possible).
+mode: local-only
+
 tiers:
   local-small:        # utility / cheap: classification, routing, formatting, docs, commit messages
     purpose: "Utility: classification, routing, formatting, docs, commit messages."
@@ -30,7 +39,7 @@ tiers:
     bind: "127.0.0.1"
     cost: free-local
 
-  cloud-bulk:         # NEW: non-sensitive overflow when local is saturated
+  cloud-bulk:         # non-sensitive overflow when local is saturated (HYBRID mode only)
     purpose: "Cloud bulk coder for NON-SENSITIVE overflow when local is saturated."
     provider: openai-compatible
     model: "glm-5.2"
@@ -38,19 +47,19 @@ tiers:
     sensitive_ok: false        # NEVER route secrets / PII / proprietary core here
     cost: metered-cheap
 
-  cloud-reasoning:    # strong reasoning / review when it pays off
+  cloud-reasoning:    # strong reasoning / review when it pays off (HYBRID mode only)
     purpose: "Strong reasoning, code review, security analysis when it pays off."
     provider: anthropic
     model: "claude-sonnet-4-6"
     cost: metered
 
-  cloud-frontier:     # Opus-class: architecture, security, final gate, adjudication, hard debugging
+  cloud-frontier:     # Opus-class: architecture, security, final gate, adjudication (HYBRID mode only)
     purpose: "Frontier: architecture, security review, threat modeling, final release gate, hard debugging, adjudication."
     provider: anthropic
     model: "claude-opus-4-8"
     cost: premium-metered
 
-  cloud-frontier-alt: # NEW: different provider for the REVIEWER on critical gates
+  cloud-frontier-alt: # different provider for the REVIEWER on critical gates (HYBRID mode only)
     purpose: "Alternate frontier provider for the reviewer on critical gates, to break correlated failure with a Claude author."
     provider: alt-frontier
     model: "gpt-frontier"
@@ -65,14 +74,14 @@ embeddings:
 
 # ---- Reviewer pairing (rubric #10): reviewer runs a DIFFERENT model than author -
 reviewer_policy:
-  principle: "On critical gates the reviewer runs a different model than the author to break correlated failure."
+  principle: "On critical gates the reviewer runs a DIFFERENT model than the author to break correlated failure. Under mode: local-only the reviewer is a different LOCAL family (Devstral vs Qwen vs Llama) - independence at $0."
   default_reviewer_tier_for_author:
-    local-small:        cloud-reasoning
-    local-mid:          cloud-frontier
-    local-large:        cloud-frontier
-    cloud-bulk:         cloud-frontier
-    cloud-reasoning:    cloud-frontier
-    cloud-frontier:     cloud-frontier-alt   # Claude author -> alt-provider reviewer
+    local-small:        local-mid         # qwen3.6:8b author -> devstral reviewer (different family)
+    local-mid:          local-large       # devstral author -> qwen3.6:27b reviewer (different family)
+    local-large:        local-mid         # qwen3.6:27b author -> devstral reviewer (different family)
+    cloud-bulk:         local-large        # (hybrid) cheap-cloud author -> local reviewer
+    cloud-reasoning:    local-large
+    cloud-frontier:     cloud-frontier-alt # (hybrid) Claude author -> alt-provider reviewer
     cloud-frontier-alt: cloud-frontier
 
 # ---- Router policy -----------------------------------------------------------
@@ -85,7 +94,8 @@ router:
     - "code-review verdict = request-changes twice on the same PR"
     - "operator explicitly requests a stronger model"
   overflow:
-    - "When local inference is saturated (max_concurrent_local_inference reached), NON-SENSITIVE coding overflow -> cloud-bulk; sensitive work waits for a local slot."
+    - "When local inference is saturated (max_concurrent_local_inference reached), NON-SENSITIVE coding overflow -> cloud-bulk (HYBRID only); under local-only, sensitive and non-sensitive work both wait for a local slot."
+  # Under mode: local-only these mappings are PERMANENT (cloud keys absent -> always local):
   offline_mode:
     cloud-reasoning: local-large
     cloud-frontier: local-large
@@ -95,6 +105,7 @@ router:
 cost_guardrails:
   monthly_hard_cap_usd: 1500          # hard ceiling; on breach stop cloud, go local-only, alert CFO + operator
   daily_usd_env: CLOUD_DAILY_BUDGET_USD
+  local_only_note: "Under mode: local-only these caps are moot (no cloud calls). They apply only if you switch to hybrid. The default .env sets CLOUD_DAILY_BUDGET_USD=0."
   max_concurrent_local_inference: 2   # MAX_CONCURRENT_LOCAL_INFERENCE
   prompt_caching:
     keep_fixed_prefix_stable: true    # stable system prompt + tool defs + CLAUDE.md so caching absorbs the prefix

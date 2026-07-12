@@ -19,6 +19,7 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>FOUNDRY_HOME</key><string>/Users/USERNAME/foundry</string>
+    <key>TZ</key><string>Australia/Brisbane</string>
   </dict>
 </dict>
 </plist>
