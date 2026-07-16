@@ -1,0 +1,67 @@
+# Foundry Support API stack — self-contained for a small VPS (D3).
+# Bring up on a clean box with only .env set:
+#   docker compose -f docker/support-api.yml --env-file .env up -d --build
+# Interim $0 deploy: run the same stack on the Mac Mini behind a Cloudflare
+# Tunnel pointed at caddy:80 (set SUPPORT_DOMAIN to the tunnel hostname).
+name: foundry-support
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  support_postgres:
+    image: postgres:16-alpine
+    <<: *restart
+    environment:
+      POSTGRES_DB: ${SUPPORT_POSTGRES_DB:-foundry_support}
+      POSTGRES_USER: ${SUPPORT_POSTGRES_USER:-foundry}
+      POSTGRES_PASSWORD: ${SUPPORT_POSTGRES_PASSWORD:?set SUPPORT_POSTGRES_PASSWORD in .env}
+      SUPPORT_APP_DB_PASSWORD: ${SUPPORT_APP_DB_PASSWORD:?set SUPPORT_APP_DB_PASSWORD in .env}
+    volumes:
+      - "${FOUNDRY_DATA_DIR:-./data}/support_postgres:/var/lib/postgresql/data"
+      - "./support/initdb:/docker-entrypoint-initdb.d:ro"
+    deploy: { resources: { limits: { memory: 1g } } }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUPPORT_POSTGRES_USER:-foundry} -d ${SUPPORT_POSTGRES_DB:-foundry_support}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  support_api:
+    build:
+      context: ..
+      dockerfile: services/support_api/Dockerfile
+    <<: *restart
+    environment:
+      SUPPORT_DATABASE_URL: postgresql://support_api_app:${SUPPORT_APP_DB_PASSWORD}@support_postgres:5432/${SUPPORT_POSTGRES_DB:-foundry_support}
+      SUPPORT_MAINTENANCE_DATABASE_URL: postgresql://${SUPPORT_POSTGRES_USER:-foundry}:${SUPPORT_POSTGRES_PASSWORD}@support_postgres:5432/${SUPPORT_POSTGRES_DB:-foundry_support}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SUPPORT_MODEL: ${SUPPORT_MODEL:-claude-haiku-4-5-20251001}
+      SUPPORT_OPERATOR_TOKEN: ${SUPPORT_OPERATOR_TOKEN:-}
+      SUPPORT_PUBLIC_BASE_URL: ${SUPPORT_PUBLIC_BASE_URL:-}
+      SUPPORT_PUBLIC_KEY_PROMPT2EAT: ${SUPPORT_PUBLIC_KEY_PROMPT2EAT:-}
+      SUPPORT_HMAC_SECRET_PROMPT2EAT: ${SUPPORT_HMAC_SECRET_PROMPT2EAT:-}
+      SUPPORT_WEBHOOK_SECRET_PROMPT2EAT: ${SUPPORT_WEBHOOK_SECRET_PROMPT2EAT:-}
+      SUPPORT_DAILY_TOKEN_BUDGET: ${SUPPORT_DAILY_TOKEN_BUDGET:-500000}
+      SUPPORT_CONVERSATION_TOKEN_BUDGET: ${SUPPORT_CONVERSATION_TOKEN_BUDGET:-50000}
+      SUPPORT_RETENTION_DAYS: ${SUPPORT_RETENTION_DAYS:-90}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      OPERATOR_TELEGRAM_CHAT_ID: ${OPERATOR_TELEGRAM_CHAT_ID:-}
+    depends_on:
+      support_postgres:
+        condition: service_healthy
+    deploy: { resources: { limits: { memory: 512m } } }
+
+  caddy:
+    image: caddy:2-alpine
+    <<: *restart
+    environment:
+      SUPPORT_DOMAIN: ${SUPPORT_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./support/Caddyfile:/etc/caddy/Caddyfile:ro"
+      - "${FOUNDRY_DATA_DIR:-./data}/caddy:/data"
+    depends_on: [support_api]
+    deploy: { resources: { limits: { memory: 256m } } }

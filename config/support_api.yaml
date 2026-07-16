@@ -1,0 +1,31 @@
+# =============================================================================
+# Foundry — Support API app registry (Contract v1 §2, §5)
+# =============================================================================
+# One entry per client app. Public keys are pinned here (they are not secret);
+# HMAC and webhook secrets come from the environment so nothing sensitive
+# lives in git. An app with a missing key or HMAC secret simply stays
+# unregistered — its requests get 401, never a soft pass.
+#
+# public_key accepts a PEM (SubjectPublicKeyInfo) or base64 of the raw
+# 32-byte Ed25519 key. Prefer public_key_env so key rotation is a redeploy.
+# =============================================================================
+
+version: 1
+
+apps:
+  prompt2eat:
+    public_key_env: SUPPORT_PUBLIC_KEY_PROMPT2EAT
+    hmac_secret_env: SUPPORT_HMAC_SECRET_PROMPT2EAT
+    webhook_url: https://www.prompt2eat.com/api/support/webhook
+    webhook_secret_env: SUPPORT_WEBHOOK_SECRET_PROMPT2EAT
+    departments: [tech, sales, billing]
+    kb_dir: services/support_api/kb/prompt2eat
+
+  # Reserved (v1 §9): additional apps are config + a pinned key each.
+  # roster:
+  #   public_key_env: SUPPORT_PUBLIC_KEY_ROSTER
+  #   hmac_secret_env: SUPPORT_HMAC_SECRET_ROSTER
+  #   webhook_url: https://roster.example.com/api/support/webhook
+  #   webhook_secret_env: SUPPORT_WEBHOOK_SECRET_ROSTER
+  #   departments: [tech, sales, billing]
+  #   kb_dir: services/support_api/kb/roster

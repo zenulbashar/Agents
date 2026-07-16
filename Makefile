@@ -60,6 +60,22 @@ marketing-up: ## Start the 24/7 n8n marketing daemon
 down: ## Stop platform services
 	$(COMPOSE) down
 
+.PHONY: support-up
+support-up: ## Start the Support API stack (postgres + api + caddy) — needs .env
+	docker compose -f docker/support-api.yml --env-file .env up -d --build
+
+.PHONY: support-down
+support-down: ## Stop the Support API stack
+	docker compose -f docker/support-api.yml --env-file .env down
+
+.PHONY: support-dev
+support-dev: ## Run the Support API locally (SUPPORT_STORE=memory for keyless dev)
+	$(PY) -m services.support_api.main
+
+.PHONY: support-test
+support-test: ## Run the Support API test suite
+	$(PY) -m pytest services/support_api/tests -q
+
 .PHONY: run
 run: ## Start the LangGraph orchestrator (control plane)
 	$(PY) -m orchestrator.main

@@ -1,0 +1,10 @@
+# Caddy front for the Support API (Contract v1 §1 streaming config).
+# SUPPORT_DOMAIN unset => localhost with a self-signed cert (dev/VPS-by-IP).
+# flush_interval -1 disables proxy buffering so SSE first-bytes go out
+# immediately — the calling app pipes the stream through a Vercel function
+# with a 25s first-byte ceiling.
+{$SUPPORT_DOMAIN:localhost} {
+	reverse_proxy support_api:8100 {
+		flush_interval -1
+	}
+}
