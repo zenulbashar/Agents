@@ -69,8 +69,12 @@ health: ## Check every dependency is reachable
 	bash scripts/healthcheck.sh
 
 .PHONY: models
-models: ## Pull/refresh local Ollama models per config/models.yaml
+models: ## Pull/refresh local Ollama models per config/models.yaml, then verify
 	bash scripts/pull_models.sh
+
+.PHONY: models-check
+models-check: ## Verify model tags resolve + .env/RAM/reviewer consistency (no downloads)
+	$(PY) scripts/verify_models.py
 
 .PHONY: backup
 backup: ## Snapshot all memory stores
