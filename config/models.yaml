@@ -1,5 +1,5 @@
 # =============================================================================
-# Foundry — MODEL ROUTING POLICY (v2: Strong Agent Rubric tiering + guardrails)
+# Foundry — MODEL ROUTING POLICY (v3: all-local, 16GB M4 Mac Mini, top-ranked opens)
 # =============================================================================
 # Tier KEYS are stable (config/agents.yaml + scripts/generate_agents.py depend on
 # them). Concrete models refresh as releases land. See docs/08 and docs/15.
@@ -8,42 +8,63 @@
 # ---- Runtime mode -----------------------------------------------------------
 # local-only (default): the 24/7 runtime (foundryd + n8n + Ollama) NEVER calls a
 # cloud tier. Every cloud-* tier resolves to its router.offline_mode local mapping,
-# and the reviewer runs a DIFFERENT LOCAL family. $0 marginal cost.
+# and the reviewer runs a DIFFERENT LOCAL FAMILY. $0 marginal cost.
 # Switch to "hybrid" (add an API key + raise CLOUD_DAILY_BUDGET_USD) only to buy
 # cloud frontier help on the hardest gates. The hard $0 guarantee is: blank cloud
 # keys in .env + CLOUD_DAILY_BUDGET_USD=0 (no key/budget -> no cloud call possible).
 mode: local-only
 
+# ---- Host budget (THE binding constraint) -----------------------------------
+# Mac Mini M4, 16GB UNIFIED memory, shared with macOS + Docker (n8n) + Postgres/
+# Qdrant/Redis. Realistic model budget: ~8-10GB => ONE model resident at a time,
+# 7-8B class (Q4_K_M ~5GB) comfortably, 12B (~7-8GB) alone. Expect ~28-35 tok/s.
+# Anything above ~14B does NOT fit. (A 2.8T model such as Kimi K3 would need
+# ~1.4TB even at 4-bit - it is API-only on any Mac, see cloud_frontier_notes.)
+host:
+  machine: "Mac Mini M4, 16GB unified memory"
+  model_memory_budget_gb: 9
+  resident_models_max: 1
+
 tiers:
-  local-small:        # utility / cheap: classification, routing, formatting, docs, commit messages
-    purpose: "Utility: classification, routing, formatting, docs, commit messages."
+  local-small:        # utility: classification, routing, formatting, docs, commit messages
+    purpose: "Utility: classification, routing, formatting, docs, commit messages. Chosen for instruction-following."
     provider: ollama
-    model: "qwen3.6:8b"
-    alt: ["llama3.3:8b"]
+    model: "llama3.3:8b"
+    alt: ["phi-4-mini:3.8b"]
+    family: llama                # distinct family -> serves as cross-family reviewer
+    ranking_note: "92.1% IFEval - best instruction-following in the 8B class (July 2026); MMLU 73.0."
+    approx_vram_gb: 5
     bind: "127.0.0.1"           # BRIGHT LINE: local models never leave loopback
     cost: free-local
 
   local-mid:          # local agentic coder: ALL bulk engineering. Zero marginal cost.
-    purpose: "Local agentic coder — all bulk engineering; the volume tier."
+    purpose: "Local agentic coder — all bulk engineering and the order-tool work; the volume tier."
     provider: ollama
-    model: "devstral-small-2"
-    alt: ["qwen3.6:27b"]
+    model: "qwen3.6:8b"
+    alt: ["qwen3.5:9b"]
+    family: qwen
+    ranking_note: "72.5% HumanEval - top coder in the 8B class (July 2026), beats Llama 3.3 8B by 4.4pp; thinking-mode toggle; near-Llama-3.1-70B quality at 8B speed."
+    approx_vram_gb: 5
     bind: "127.0.0.1"
     cost: free-local
 
-  local-large:        # heavier local reasoning when offline / cost-bound
-    purpose: "Heavier local reasoning when offline or cost-bound."
+  local-large:        # heavier local reasoning - the frontier we actually have on 16GB
+    purpose: "Heaviest reasoning that fits 16GB: architecture, security review, adjudication."
     provider: ollama
-    model: "qwen3.6:27b"
-    alt: ["llama3.3:70b-instruct-q4_K_M"]
+    model: "gemma4:12b"
+    alt: ["qwen3.6:14b"]
+    family: gemma
+    ranking_note: "77.2% MMLU Pro - beats Gemma 3 27B at less than half the parameters (July 2026). Largest model that fits this host."
+    approx_vram_gb: 8
     bind: "127.0.0.1"
     cost: free-local
+    note: "Loads ALONE on 16GB - do not co-resident with another tier."
 
   cloud-bulk:         # non-sensitive overflow when local is saturated (HYBRID mode only)
     purpose: "Cloud bulk coder for NON-SENSITIVE overflow when local is saturated."
     provider: openai-compatible
     model: "glm-5.2"
-    alt: ["deepseek-v4"]
+    alt: ["deepseek-v4", "kimi-k3"]
     sensitive_ok: false        # NEVER route secrets / PII / proprietary core here
     cost: metered-cheap
 
@@ -60,25 +81,42 @@ tiers:
     cost: premium-metered
 
   cloud-frontier-alt: # different provider for the REVIEWER on critical gates (HYBRID mode only)
-    purpose: "Alternate frontier provider for the reviewer on critical gates, to break correlated failure with a Claude author."
+    purpose: "Alternate frontier provider for the reviewer on critical gates, to break correlated failure."
     provider: alt-frontier
     model: "gpt-frontier"
-    alt: ["gemini-frontier"]
+    alt: ["gemini-frontier", "kimi-k3"]
     cost: premium-metered
+
+# ---- Kimi K3 / frontier-open models: why they are NOT a local tier ----------
+cloud_frontier_notes:
+  kimi_k3:
+    status: "Open WEIGHTS (Moonshot, July 2026) - but not locally runnable here."
+    size: "2.8T parameters (MoE, 896 experts / 16 active per token)."
+    why_not_local: >
+      All 2.8T parameters must be resident to serve any token - MoE routing saves
+      compute, not memory. At 4-bit that is roughly 1.4TB, versus 16GB on this host
+      (and 128GB on the largest Mac Studio). Storage does NOT substitute: iCloud is a
+      sync service, not addressable memory, and even local-NVMe mmap would run at
+      seconds-per-token. Open weights change the licence, not the memory arithmetic.
+    how_to_use_if_wanted: >
+      HYBRID mode only, via the Moonshot API, as cloud-bulk or cloud-frontier-alt
+      (~$3/M in, $15/M out). Non-sensitive work ONLY - never customer PII (that is a
+      bright line), and spending is an operator gate.
 
 embeddings:
   provider: ollama
   model: "nomic-embed-text"
   dim: 768
   bind: "127.0.0.1"
+  note: "Changing the embedding model changes the vector dim -> the vault/memory index MUST be rebuilt."
 
 # ---- Reviewer pairing (rubric #10): reviewer runs a DIFFERENT model than author -
 reviewer_policy:
-  principle: "On critical gates the reviewer runs a DIFFERENT model than the author to break correlated failure. Under mode: local-only the reviewer is a different LOCAL family (Devstral vs Qwen vs Llama) - independence at $0."
+  principle: "On critical gates the reviewer runs a DIFFERENT MODEL FAMILY than the author, to break correlated failure. Under mode: local-only this is Llama vs Qwen vs Gemma - three genuinely independent families, at $0."
   default_reviewer_tier_for_author:
-    local-small:        local-mid         # qwen3.6:8b author -> devstral reviewer (different family)
-    local-mid:          local-large       # devstral author -> qwen3.6:27b reviewer (different family)
-    local-large:        local-mid         # qwen3.6:27b author -> devstral reviewer (different family)
+    local-small:        local-mid          # llama3.3 author  -> qwen3.6 reviewer  (llama -> qwen)
+    local-mid:          local-large        # qwen3.6 author   -> gemma4 reviewer   (qwen  -> gemma)
+    local-large:        local-mid          # gemma4 author    -> qwen3.6 reviewer  (gemma -> qwen)
     cloud-bulk:         local-large        # (hybrid) cheap-cloud author -> local reviewer
     cloud-reasoning:    local-large
     cloud-frontier:     cloud-frontier-alt # (hybrid) Claude author -> alt-provider reviewer
@@ -93,8 +131,9 @@ router:
     - "eval pass-rate below the agent's threshold on the change"
     - "code-review verdict = request-changes twice on the same PR"
     - "operator explicitly requests a stronger model"
+  escalation_ceiling_local_only: "local-large (gemma4:12b) is the top of the ladder under local-only; beyond it, escalate to the OPERATOR, not to a cloud model."
   overflow:
-    - "When local inference is saturated (max_concurrent_local_inference reached), NON-SENSITIVE coding overflow -> cloud-bulk (HYBRID only); under local-only, sensitive and non-sensitive work both wait for a local slot."
+    - "When local inference is saturated (max_concurrent_local_inference reached), work QUEUES. Under local-only nothing spills to cloud - 16GB serves one model at a time."
   # Under mode: local-only these mappings are PERMANENT (cloud keys absent -> always local):
   offline_mode:
     cloud-reasoning: local-large
@@ -103,14 +142,14 @@ router:
 
 # ---- Cost guardrails (autonomous work bills at real API rates) ---------------
 cost_guardrails:
-  monthly_hard_cap_usd: 1500          # hard ceiling; on breach stop cloud, go local-only, alert CFO + operator
+  monthly_hard_cap_usd: 1500          # applies to HYBRID only; local-only spends nothing
   daily_usd_env: CLOUD_DAILY_BUDGET_USD
-  local_only_note: "Under mode: local-only these caps are moot (no cloud calls). They apply only if you switch to hybrid. The default .env sets CLOUD_DAILY_BUDGET_USD=0."
-  max_concurrent_local_inference: 2   # MAX_CONCURRENT_LOCAL_INFERENCE
+  local_only_note: "Under mode: local-only these caps are moot (no cloud calls). The default .env sets CLOUD_DAILY_BUDGET_USD=0."
+  max_concurrent_local_inference: 1   # 16GB => ONE model resident; raise only with more RAM
   prompt_caching:
     keep_fixed_prefix_stable: true    # stable system prompt + tool defs + CLAUDE.md so caching absorbs the prefix
     note: "Do not reorder/rewrite the fixed prefix between turns; put variable content last."
-  routing_bias: "Push every non-frontier-worthy task to local (zero marginal cost). Frontier only for the rubric's frontier work."
+  routing_bias: "Everything runs local (zero marginal cost). Escalate hard cases to the operator, not to spend."
   on_breach: "Halt new cloud calls; finish in-flight; fall back to local; alert CFO + operator."
 
 # ---- Bright lines (mirrored in config/policies.yaml; no tier bypasses) -------
