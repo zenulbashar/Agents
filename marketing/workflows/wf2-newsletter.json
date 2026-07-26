@@ -1,0 +1,204 @@
+{
+  "name": "WF2 - Newsletter",
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Australia/Brisbane",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 7 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "Monday 07:30 Brisbane",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-200, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "newsletter",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "Read newsletter queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [20, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only APPROVED and due rows. Append the Spam Act 2003 identification footer.\n// ACMA requires: accurate sender identification (legal name + ABN + address)\n// and a functional unsubscribe honoured within 5 business days.\nconst FOOTER = `\n<hr style=\"margin-top:32px;border:none;border-top:1px solid #ddd\">\n<p style=\"font-size:12px;color:#666;line-height:1.5\">\n  REPLACE_LEGAL_NAME &middot; ABN REPLACE_ABN<br>\n  REPLACE_POSTAL_ADDRESS<br>\n  You are receiving this because you subscribed at prompt2eat.<br>\n  <a href=\"{{ unsubscribe }}\">Unsubscribe</a>\n</p>`;\n\nconst now = Date.now();\nconst out = [];\n\nfor (const item of $input.all()) {\n  const r = item.json;\n  if (String(r.status ?? '').trim().toLowerCase() !== 'approved') continue;\n\n  const when = String(r.send_after ?? '').trim();\n  if (when) {\n    const t = Date.parse(when);\n    if (!isNaN(t) && t > now) continue;\n  }\n\n  if (!String(r.subject ?? '').trim() || !String(r.html_body ?? '').trim()) continue;\n\n  out.push({ json: { ...r, html_with_footer: String(r.html_body) + FOOTER } });\n}\n\n// One campaign per run - never blast the backlog.\nreturn out.slice(0, 1);"
+      },
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "Approved + footer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/emailCampaigns",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sendInBlueApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: 'p2e-' + $json.id, subject: $json.subject, sender: { name: 'REPLACE_SENDER_NAME', email: 'REPLACE_SENDER_EMAIL' }, type: 'classic', htmlContent: $json.html_with_footer, recipients: { listIds: [ Number('REPLACE_BREVO_LIST_ID') ] } }) }}",
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000004",
+      "name": "Brevo create campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Brevo - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.brevo.com/v3/emailCampaigns/{{ $json.id }}/sendNow",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sendInBlueApi",
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000005",
+      "name": "Brevo send campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Brevo - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "newsletter",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Approved + footer').item.json.id }}",
+            "status": "sent",
+            "sent_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000006",
+      "name": "Mark sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 220],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "newsletter",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Approved + footer').item.json.id }}",
+            "status": "error"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000007",
+      "name": "Mark error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 420],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Monday 07:30 Brisbane": {
+      "main": [[{ "node": "Read newsletter queue", "type": "main", "index": 0 }]]
+    },
+    "Read newsletter queue": {
+      "main": [[{ "node": "Approved + footer", "type": "main", "index": 0 }]]
+    },
+    "Approved + footer": {
+      "main": [[{ "node": "Brevo create campaign", "type": "main", "index": 0 }]]
+    },
+    "Brevo create campaign": {
+      "main": [
+        [{ "node": "Brevo send campaign", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Brevo send campaign": {
+      "main": [
+        [{ "node": "Mark sent", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {}
+}

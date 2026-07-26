@@ -55,7 +55,7 @@ if [ ! -f marketing/.env ]; then
   {
     echo "N8N_ENCRYPTION_KEY=$(openssl rand -hex 32)"
     echo "AI_BASE_URL=http://host.docker.internal:11434/v1"
-    echo "AI_MODEL=qwen3.6:8b"
+    echo "AI_MODEL=qwen3.5:9b"
   } > marketing/.env
   echo "==> Wrote marketing/.env - BACK UP N8N_ENCRYPTION_KEY in your password manager."
 fi
@@ -70,8 +70,18 @@ launchctl load -w "$PLIST"
 # 8. Final consistency check
 python3 scripts/verify_models.py || echo "==> fix the reported model issues, then re-run: make models-check"
 
+# Read the model line from config/models.yaml - the single source of truth - rather than
+# hardcoding it here, which previously printed tags that were never pulled.
+MODEL_LINE=$(python3 - <<'PY'
+import yaml
+tiers = yaml.safe_load(open("config/models.yaml")).get("tiers") or {}
+print("  ".join(f"{v['model']} ({k.replace('local-', '')})"
+                for k, v in tiers.items()
+                if (v or {}).get("provider") == "ollama" and v.get("model")))
+PY
+)
 echo "==> Foundry setup complete."
-echo "    models:   llama3.3:8b (utility) qwen3.6:8b (coder) gemma4:12b (reasoning) - all local, \$0"
+echo "    models:   $MODEL_LINE - all local, \$0"
 echo "    n8n:      http://127.0.0.1:5678"
 echo "    foundryd: launchd com.foundry.daemon (24/7, survives Cowork removal)"
 echo "    vault:    open $FOUNDRY_HOME/vault in Obsidian"

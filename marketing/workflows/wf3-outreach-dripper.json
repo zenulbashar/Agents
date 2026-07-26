@@ -1,0 +1,200 @@
+{
+  "name": "WF3 - Outreach dripper",
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Australia/Brisbane",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "c3000000-0000-4000-8000-000000000001",
+      "name": "Weekdays 09:00 Brisbane",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-200, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "outreach",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000002",
+      "name": "Read outreach queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [20, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// HARD CAP: 10 per weekday. Spam Act 2003 (ACMA) - consent, accurate sender\n// identification with ABN, functional unsubscribe. Published business addresses only.\n// Brevo free tier is 300 emails/day SHARED with the newsletter and Zale IT.\nconst DAILY_CAP = 10;\n\nconst FOOTER = `\n<hr style=\"margin-top:32px;border:none;border-top:1px solid #ddd\">\n<p style=\"font-size:12px;color:#666;line-height:1.5\">\n  Sent by REPLACE_LEGAL_NAME &middot; ABN REPLACE_ABN<br>\n  REPLACE_POSTAL_ADDRESS<br>\n  Not relevant? <a href=\"mailto:REPLACE_UNSUB_EMAIL?subject=Unsubscribe\">Tell us and we stop immediately</a>.\n</p>`;\n\nconst seen = new Set();\nconst out = [];\n\nfor (const item of $input.all()) {\n  const r = item.json;\n  if (String(r.status ?? '').trim().toLowerCase() !== 'approved') continue;\n\n  const email = String(r.email ?? '').trim().toLowerCase();\n  if (!email || !email.includes('@')) continue;\n\n  // Never contact the same address twice in one run.\n  if (seen.has(email)) continue;\n  seen.add(email);\n\n  // A published business address is required - no personal-looking free inboxes.\n  const domain = email.split('@')[1] || '';\n  const FREE = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'];\n  if (FREE.includes(domain)) continue;\n\n  if (!String(r.subject ?? '').trim() || !String(r.body ?? '').trim()) continue;\n\n  out.push({\n    json: {\n      ...r,\n      email,\n      html_with_footer: String(r.body) + FOOTER\n    }\n  });\n\n  if (out.length >= DAILY_CAP) break;\n}\n\nreturn out;"
+      },
+      "id": "c3000000-0000-4000-8000-000000000003",
+      "name": "Approved, capped at 10",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000004",
+      "name": "One at a time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/smtp/email",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sendInBlueApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sender: { name: 'REPLACE_SENDER_NAME', email: 'REPLACE_SENDER_EMAIL' }, to: [ { email: $json.email, name: $json.contact_name || $json.venue } ], subject: $json.subject, htmlContent: $json.html_with_footer }) }}",
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000005",
+      "name": "Brevo send one",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Brevo - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "outreach",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('One at a time').item.json.id }}",
+            "status": "sent",
+            "sent_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000006",
+      "name": "Mark sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 220],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "outreach",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('One at a time').item.json.id }}",
+            "status": "error"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000007",
+      "name": "Mark error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 420],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekdays 09:00 Brisbane": {
+      "main": [[{ "node": "Read outreach queue", "type": "main", "index": 0 }]]
+    },
+    "Read outreach queue": {
+      "main": [[{ "node": "Approved, capped at 10", "type": "main", "index": 0 }]]
+    },
+    "Approved, capped at 10": {
+      "main": [[{ "node": "One at a time", "type": "main", "index": 0 }]]
+    },
+    "One at a time": {
+      "main": [
+        [],
+        [{ "node": "Brevo send one", "type": "main", "index": 0 }]
+      ]
+    },
+    "Brevo send one": {
+      "main": [
+        [{ "node": "Mark sent", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mark sent": {
+      "main": [[{ "node": "One at a time", "type": "main", "index": 0 }]]
+    },
+    "Mark error": {
+      "main": [[{ "node": "One at a time", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {}
+}

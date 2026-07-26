@@ -1,0 +1,596 @@
+{
+  "name": "WF1 - Social poster",
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Australia/Brisbane",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7-21 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Hourly 07-21 Brisbane",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-200, 320]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "config",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Read config tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [20, 320],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "social",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Read social queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, 320],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Select rows that are APPROVED and DUE, and attach config values.\n// Review mode: a row is never touched unless a human set status = approved.\nconst cfg = {};\nfor (const c of $('Read config tab').all()) {\n  if (c.json.key) cfg[String(c.json.key).trim()] = String(c.json.value ?? '').trim();\n}\n\nconst now = Date.now();\nconst out = [];\n\nfor (const item of $input.all()) {\n  const r = item.json;\n  const status = String(r.status ?? '').trim().toLowerCase();\n  if (status !== 'approved') continue;\n\n  // scheduled_at empty means \"send at the next run\"\n  const when = String(r.scheduled_at ?? '').trim();\n  if (when) {\n    const t = Date.parse(when);\n    if (!isNaN(t) && t > now) continue;\n  }\n\n  const channel = String(r.channel ?? '').trim().toLowerCase();\n\n  // Per-channel kill switches from the config tab, e.g. x_paused = true\n  if (cfg[channel + '_paused'] === 'true') continue;\n\n  // X costs money per post ($0.015, $0.20 with a URL). Refuse to post a link\n  // unless the row was explicitly marked link_post.\n  if (channel === 'x') {\n    const isLink = String(r.link_post ?? '').trim().toLowerCase() === 'true';\n    const hasUrl = /https?:\\/\\//i.test(String(r.text ?? ''));\n    if (hasUrl && !isLink) continue;\n  }\n\n  out.push({\n    json: {\n      ...r,\n      channel,\n      ig_user_id: cfg.ig_user_id || '',\n      tiktok_open_id: cfg.tiktok_open_id || ''\n    }\n  });\n}\n\nreturn out;"
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Select due rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 320]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-ig",
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "ig",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ig"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-igreel",
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "ig_reel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ig_reel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-x",
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "x",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "x"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "r-tiktok",
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "tiktok",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "tiktok"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Route by channel",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [680, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $json.ig_user_id }}/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.image_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "IG create image container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 40],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Meta Graph - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $('Select due rows').item.json.ig_user_id }}/media_publish",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "IG publish image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 40],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Meta Graph - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $json.ig_user_id }}/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "video_url",
+              "value": "={{ $json.video_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "IG create reel container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 240],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Meta Graph - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Wait for encode",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1160, 240],
+      "webhookId": "a1000000-0000-4000-8000-0000000000wa"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v23.0/{{ $('IG create reel container').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "status_code"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000010",
+      "name": "IG check reel status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 240],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Meta Graph - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "reel-finished",
+              "leftValue": "={{ $json.status_code }}",
+              "rightValue": "FINISHED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000011",
+      "name": "Reel FINISHED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1600, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $('Select due rows').item.json.ig_user_id }}/media_publish",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $('IG create reel container').item.json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000012",
+      "name": "IG publish reel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1820, 180],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Meta Graph - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.x.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth1Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.text }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000013",
+      "name": "Post to X",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 460],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "twitterOAuth1Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "X - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source_info: { source: 'PULL_FROM_URL', video_url: $json.video_url } }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000014",
+      "name": "TikTok init draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 660],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "TikTok - Authorization Bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "social",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Select due rows').item.json.id }}",
+            "status": "={{ $('Select due rows').item.json.channel === 'tiktok' ? 'in_drafts' : 'posted' }}",
+            "posted_at": "={{ $now.toISO() }}",
+            "post_id": "={{ $json.id || '' }}"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000015",
+      "name": "Mark posted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2100, 380],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "social",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Select due rows').item.json.id }}",
+            "status": "error"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000016",
+      "name": "Mark error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2100, 700],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Google Sheets - marketing-queue"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hourly 07-21 Brisbane": {
+      "main": [[{ "node": "Read config tab", "type": "main", "index": 0 }]]
+    },
+    "Read config tab": {
+      "main": [[{ "node": "Read social queue", "type": "main", "index": 0 }]]
+    },
+    "Read social queue": {
+      "main": [[{ "node": "Select due rows", "type": "main", "index": 0 }]]
+    },
+    "Select due rows": {
+      "main": [[{ "node": "Route by channel", "type": "main", "index": 0 }]]
+    },
+    "Route by channel": {
+      "main": [
+        [{ "node": "IG create image container", "type": "main", "index": 0 }],
+        [{ "node": "IG create reel container", "type": "main", "index": 0 }],
+        [{ "node": "Post to X", "type": "main", "index": 0 }],
+        [{ "node": "TikTok init draft", "type": "main", "index": 0 }]
+      ]
+    },
+    "IG create image container": {
+      "main": [
+        [{ "node": "IG publish image", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "IG publish image": {
+      "main": [
+        [{ "node": "Mark posted", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "IG create reel container": {
+      "main": [
+        [{ "node": "Wait for encode", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait for encode": {
+      "main": [[{ "node": "IG check reel status", "type": "main", "index": 0 }]]
+    },
+    "IG check reel status": {
+      "main": [
+        [{ "node": "Reel FINISHED?", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Reel FINISHED?": {
+      "main": [
+        [{ "node": "IG publish reel", "type": "main", "index": 0 }],
+        [{ "node": "Wait for encode", "type": "main", "index": 0 }]
+      ]
+    },
+    "IG publish reel": {
+      "main": [
+        [{ "node": "Mark posted", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Post to X": {
+      "main": [
+        [{ "node": "Mark posted", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    },
+    "TikTok init draft": {
+      "main": [
+        [{ "node": "Mark posted", "type": "main", "index": 0 }],
+        [{ "node": "Mark error", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {}
+}

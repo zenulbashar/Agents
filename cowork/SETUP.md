@@ -114,6 +114,10 @@ Be honest with me about this at the end:
   containment/jails; per-agent activity logging; n8n running 24/7; the launchd daemon running,
   matching cron, draining the queue, and calling the local model for real; the order-tool in
   its jail; Telegram once I set the token.
-- **Not yet:** the Telegram APPROVAL REPLY loop. Bright-line requests are SENT to me, but
-  nothing polls for my Approve/Reject yet - so gated work stays blocked until I act manually.
-  That is deliberate (fail-closed), but say it plainly rather than implying gates auto-resolve.
+- **Also works (corrected 2026-07-26):** the Telegram APPROVAL REPLY loop. An earlier draft of
+  this doc said nothing polled for Approve/Reject - that is out of date. `foundryd.py` calls
+  `telegram().poll_once()` every tick (15s) to resolve button taps and operator commands, then
+  `run_approved()` executes what was approved and archives it; `/pause` is honoured. Verified
+  end-to-end on 2026-07-26.
+- **Still true:** nothing auto-resolves a gate. Bright lines PARK and wait for the operator
+  indefinitely (fail-closed by design). If the operator never taps, the work never runs.

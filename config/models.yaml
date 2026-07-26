@@ -30,10 +30,10 @@ tiers:
   local-small:        # utility: classification, routing, formatting, docs, commit messages
     purpose: "Utility: classification, routing, formatting, docs, commit messages. Chosen for instruction-following."
     provider: ollama
-    model: "llama3.3:8b"
+    model: "llama3.1:8b"
     alt: ["phi-4-mini:3.8b"]
     family: llama                # distinct family -> serves as cross-family reviewer
-    ranking_note: "92.1% IFEval - best instruction-following in the 8B class (July 2026); MMLU 73.0."
+    ranking_note: "SUBSTITUTED by Cowork 2026-07-26: original llama3.3:8b does not exist (Llama 3.3 is 70B-only; Llama 4 is MoE, smallest 67GB). llama3.1:8b (~4.9GB) is the only Llama-family 8B that fits 16GB, kept for cross-family reviewer independence. Benchmark ranking TO BE RE-VERIFIED."
     approx_vram_gb: 5
     bind: "127.0.0.1"           # BRIGHT LINE: local models never leave loopback
     cost: free-local
@@ -41,11 +41,11 @@ tiers:
   local-mid:          # local agentic coder: ALL bulk engineering. Zero marginal cost.
     purpose: "Local agentic coder — all bulk engineering and the order-tool work; the volume tier."
     provider: ollama
-    model: "qwen3.6:8b"
-    alt: ["qwen3.5:9b"]
+    model: "qwen3.5:9b"
+    alt: ["qwen3.5:4b"]
     family: qwen
-    ranking_note: "72.5% HumanEval - top coder in the 8B class (July 2026), beats Llama 3.3 8B by 4.4pp; thinking-mode toggle; near-Llama-3.1-70B quality at 8B speed."
-    approx_vram_gb: 5
+    ranking_note: "SUBSTITUTED by Cowork 2026-07-26: original qwen3.6:8b does not exist (Qwen3.6 smallest published size is 27B, ~17GB - too big for 16GB). qwen3.5:9b (~6.6GB) was this tier's own listed alt and fits. Benchmark ranking TO BE RE-VERIFIED."
+    approx_vram_gb: 7
     bind: "127.0.0.1"
     cost: free-local
 
@@ -125,7 +125,7 @@ cloud_frontier_notes:
 
 embeddings:
   provider: ollama
-  model: "nomic-embed-text"
+  model: "nomic-embed-text:latest"
   dim: 768
   bind: "127.0.0.1"
   note: "Changing the embedding model changes the vector dim -> the vault/memory index MUST be rebuilt."

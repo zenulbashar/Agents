@@ -22,7 +22,7 @@ businesses:
       x:         { cadence: "2/day link-free + 1 link post/week", rule: "NO URLs by default ($0.015 vs $0.20/post); link in bio" }
       instagram: { cadence: "1/day", rule: "JPEG at a public URL; <=100 API posts/24h" }
       tiktok:    { cadence: "2/week", rule: "Phase 1 = draft/inbox mode (no audit); finish in-app" }
-      newsletter:{ cadence: "weekly Monday", provider: brevo }
+      newsletter: { cadence: "weekly Monday", provider: brevo }
       outreach:  { cadence: "<=10/weekday", rule: "Spam Act 2003 - personalised, role-relevant, published business addresses only" }
     guardrails: "marketing/content/guardrails.md (verbatim in every generation prompt)"
 

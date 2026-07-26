@@ -1,0 +1,137 @@
+{
+  "name": "WF4 - IG token refresh",
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Australia/Brisbane",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "d4000000-0000-4000-8000-000000000001",
+      "name": "1st of month 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-200, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v23.0/refresh_access_token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "ig_refresh_token"
+            },
+            {
+              "name": "access_token",
+              "value": "REPLACE_WITH_CURRENT_LONG_LIVED_TOKEN"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4000000-0000-4000-8000-000000000002",
+      "name": "Refresh IG token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Instagram long-lived tokens last 60 days. This refresh extends it another 60.\n// An expired token is the single most common silent failure in this stack, so the\n// email below is deliberately loud and tells you exactly what to do.\nconst t = $input.first().json;\nconst days = Math.round((Number(t.expires_in) || 0) / 86400);\nconst expiresOn = new Date(Date.now() + (Number(t.expires_in) || 0) * 1000)\n  .toISOString().slice(0, 10);\n\nreturn [{\n  json: {\n    days,\n    expiresOn,\n    token: t.access_token || '',\n    subject: `[Foundry] Instagram token refreshed - paste into n8n (expires ${expiresOn})`,\n    body: [\n      'The Instagram long-lived token was refreshed automatically.',\n      '',\n      `New token expires: ${expiresOn} (${days} days).`,\n      '',\n      'ACTION REQUIRED - the refresh does NOT update the stored credential:',\n      '  1. Open n8n at http://127.0.0.1:5678',\n      '  2. Credentials -> \"Meta Graph - prompt2eat\"',\n      '  3. Replace the access token with the one below, save.',\n      '  4. Update REPLACE_WITH_CURRENT_LONG_LIVED_TOKEN in WF4 as well.',\n      '',\n      'New token:',\n      t.access_token || '(none returned - check the error)',\n      '',\n      'If you do nothing, Instagram posting stops silently when the old token expires.'\n    ].join('\\n')\n  }\n}];"
+      },
+      "id": "d4000000-0000-4000-8000-000000000003",
+      "name": "Build reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/smtp/email",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sendInBlueApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sender: { name: 'Foundry', email: 'REPLACE_SENDER_EMAIL' }, to: [ { email: 'REPLACE_OPERATOR_EMAIL' } ], subject: $json.subject, textContent: $json.body }) }}",
+        "options": {}
+      },
+      "id": "d4000000-0000-4000-8000-000000000004",
+      "name": "Email the operator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 220],
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Brevo - prompt2eat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The refresh call itself failed - that is worse than a successful refresh,\n// because posting will stop within days and nothing else will tell you.\nreturn [{\n  json: {\n    subject: '[Foundry] URGENT - Instagram token refresh FAILED',\n    body: [\n      'The monthly Instagram token refresh did not succeed.',\n      '',\n      'Instagram posting (WF1) will stop silently when the current token expires,',\n      'which is at most 60 days after it was last issued.',\n      '',\n      'Fix: generate a new long-lived token in the Meta developer console,',\n      'paste it into the n8n credential \"Meta Graph - prompt2eat\", and update',\n      'REPLACE_WITH_CURRENT_LONG_LIVED_TOKEN in WF4.',\n      '',\n      'Error detail:',\n      JSON.stringify($input.first().json, null, 2)\n    ].join('\\n')\n  }\n}];"
+      },
+      "id": "d4000000-0000-4000-8000-000000000005",
+      "name": "Build failure alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/smtp/email",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sendInBlueApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sender: { name: 'Foundry', email: 'REPLACE_SENDER_EMAIL' }, to: [ { email: 'REPLACE_OPERATOR_EMAIL' } ], subject: $json.subject, textContent: $json.body }) }}",
+        "options": {}
+      },
+      "id": "d4000000-0000-4000-8000-000000000006",
+      "name": "Email the failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 460],
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Brevo - prompt2eat"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "1st of month 09:00": {
+      "main": [[{ "node": "Refresh IG token", "type": "main", "index": 0 }]]
+    },
+    "Refresh IG token": {
+      "main": [
+        [{ "node": "Build reminder", "type": "main", "index": 0 }],
+        [{ "node": "Build failure alert", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build reminder": {
+      "main": [[{ "node": "Email the operator", "type": "main", "index": 0 }]]
+    },
+    "Build failure alert": {
+      "main": [[{ "node": "Email the failure", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {}
+}

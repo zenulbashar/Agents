@@ -47,7 +47,7 @@ action_classes:
   delete_or_remove:        { decision: human_gate, reason: "Bright line: ANY delete/remove/deprovision must be verified by the operator." }
   destructive_op:          { decision: human_gate, reason: "Bright line: irreversible data/op." }
   modify_policies:         { decision: human_gate, reason: "Bright line: changing the rules." }
-  register_permanent_agent:{ decision: human_gate, reason: "Bright line: a PERMANENT agent joins the org." }
+  register_permanent_agent: { decision: human_gate, reason: "Bright line: a PERMANENT agent joins the org." }
   modify_agent:            { decision: human_gate, reason: "Bright line: re-scoping an existing agent." }
   modify_skill_or_tool:    { decision: human_gate, reason: "Bright line: changing skills/tools changes behaviour." }
   publish_external:        { decision: human_gate, reason: "Outward-facing publishing." }

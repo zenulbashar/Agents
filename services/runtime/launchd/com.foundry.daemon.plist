@@ -2,13 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Foundry 24/7 agent runtime. Replace USERNAME with your Mac username, copy to
      ~/Library/LaunchAgents/, then: launchctl load -w ~/Library/LaunchAgents/com.foundry.daemon.plist
-     KeepAlive=true means macOS restarts it on crash or reboot - 24/7 without Cowork. -->
+     KeepAlive=true means macOS restarts it on crash or reboot - 24/7 without Cowork.
+     NOTE: must run the VENV python (.venv/bin/python3), NOT /usr/bin/python3 - the system
+     Python has no pyyaml/httpx, so foundryd dies on `import yaml` and KeepAlive crash-loops. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.foundry.daemon</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/python3</string>
+    <string>/Users/USERNAME/foundry/.venv/bin/python3</string>
     <string>/Users/USERNAME/foundry/services/runtime/foundryd.py</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/USERNAME/foundry</string>

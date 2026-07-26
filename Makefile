@@ -3,7 +3,9 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-PY ?= python3
+# Default to the repo venv: deps (pyyaml, httpx, ...) live there, not in system python3.
+# Override for a one-off, e.g. `make PY=python3.12 validate`.
+PY ?= .venv/bin/python3
 COMPOSE ?= docker compose -f docker/docker-compose.yml
 
 .PHONY: help
@@ -37,7 +39,8 @@ smoke: ## Prove the supervisor halts at a bright line (merge_to_main)
 	$(PY) scripts/smoke.py
 
 .PHONY: validate
-validate: ## Validate the registry + rubric without writing files
+validate: ## Validate config YAML + governance + the registry/rubric, without writing files
+	$(PY) scripts/check_config.py
 	$(PY) scripts/generate_agents.py --check
 
 .PHONY: daemon
