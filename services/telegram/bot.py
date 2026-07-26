@@ -14,7 +14,14 @@ Commands (operator only): /help /status /approvals /priority <id> <n>
 SECURITY: updates are accepted ONLY from OPERATOR_TELEGRAM_CHAT_ID. Anyone else who
 finds the bot is ignored and logged - otherwise a stranger could clear a bright line.
 
-Config: config/telegram.yaml. Env: TELEGRAM_BOT_TOKEN, OPERATOR_TELEGRAM_CHAT_ID.
+CREDENTIALS: env first, then the macOS Keychain. This matters because foundryd runs
+under launchd, which does NOT inherit your shell environment - exporting the token in
+.zshrc would never reach the daemon. Keychain keeps the secret off disk (config/
+access.yaml: secrets never live in a file), so store it once with:
+
+    security add-generic-password -a "$USER" -s foundry-telegram-token -w '<BOT_TOKEN>'
+    security add-generic-password -a "$USER" -s foundry-telegram-chat  -w '<CHAT_ID>'
+
 NOTE: api.telegram.org is allowlisted for the runtime domain (config/access.yaml).
 Uses stdlib urllib - no third-party dependency.
 """
@@ -22,9 +29,9 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import time
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -33,8 +40,21 @@ sys.path.insert(0, str(ROOT))
 
 from services.runtime import approvals   # noqa: E402
 
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-CHAT = os.environ.get("OPERATOR_TELEGRAM_CHAT_ID", "")
+
+def _keychain(service):
+    """Read a secret from the macOS Keychain. Empty string if absent/unavailable."""
+    try:
+        out = subprocess.run(["security", "find-generic-password", "-s", service, "-w"],
+                             capture_output=True, text=True, timeout=10, check=False)
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "") or _keychain("foundry-telegram-token")
+CHAT = os.environ.get("OPERATOR_TELEGRAM_CHAT_ID", "") or _keychain("foundry-telegram-chat")
 API = "https://api.telegram.org/bot" + TOKEN
 
 DATA = ROOT / "data"
@@ -229,7 +249,9 @@ def poll_once(timeout=0):
 
 if __name__ == "__main__":
     if not configured():
-        print("Set TELEGRAM_BOT_TOKEN and OPERATOR_TELEGRAM_CHAT_ID first.")
+        print("Telegram not configured. Store the credentials in the Keychain:")
+        print("  security add-generic-password -a \"$USER\" -s foundry-telegram-token -w '<BOT_TOKEN>'")
+        print("  security add-generic-password -a \"$USER\" -s foundry-telegram-chat  -w '<CHAT_ID>'")
         raise SystemExit(1)
     report("Foundry Telegram channel test - CEO reporting online. Send /help.")
     print("Sent test message. Polling once for a reply...")
