@@ -27,11 +27,12 @@ global:
   network:
     egress: default-deny
     always_allow: ["127.0.0.1", "localhost"]   # local models/services only by default
+    local_only_note: "Under config/models.yaml mode: local-only, inference needs ONLY 127.0.0.1 (Ollama). The api.anthropic.com grants below are dormant unless you switch to hybrid."
   secrets:
     store: "n8n credential store + macOS Keychain (via a broker); NEVER on disk, NEVER in Cowork files, NEVER in the vault"
     read: human_gate                 # reading/rotating a secret is a bright line
   runtime:
-    daemon_work: "Docker containers (n8n, services) - the only thing that runs 24/7"
+    daemon_work: "Docker containers (n8n, services) + foundryd under launchd - the 24/7 layer"
     supervised_work: "Claude Cowork, jailed to ~/foundry, holds NO keys, writes only to its workspace + the Google Sheet queue"
     sandbox: "code execution via container or macOS sandbox-exec profiles; CPU/mem/time limited"
 
@@ -39,16 +40,32 @@ global:
 # Each agent belongs to one or more domains; it inherits that domain's grants.
 domains:
 
+  runtime:                 # foundryd itself: the 24/7 daemon + the operator channel
+    fs_allow: ["~/foundry/logs", "~/foundry/data/queue", "~/foundry/data/outbox"]
+    egress_allow: ["127.0.0.1", "api.telegram.org"]
+    credentials: ["TELEGRAM_BOT_TOKEN (env, daemon only)"]
+    notes: >
+      api.telegram.org is REQUIRED: it is how the CEO reports to the operator and how
+      every bright-line approval is raised (services/telegram/bot.py). Without this grant
+      the default-deny egress silently blocks the operator channel. Inference itself stays
+      on 127.0.0.1 (Ollama) - the daemon needs no other outbound host under local-only.
+
   platform:                # the company OS itself (engineering/security/infra agents)
     fs_allow: ["~/foundry (repo)", "~/foundry/workspaces/platform"]
     egress_allow: ["127.0.0.1", "api.anthropic.com", "registry.ollama.ai", "github.com", "objects.githubusercontent.com"]
     credentials: ["gitea_token (container only)"]
 
   prompt2eat:              # the ordering tool business
-    fs_allow: ["~/foundry/workspaces/prompt2eat"]
-    egress_allow: ["127.0.0.1", "api.anthropic.com", "order.zaleit.com.au", "prompt2eat.com", "media.prompt2eat.com"]
+    fs_allow:
+      - "~/foundry/workspaces/prompt2eat"
+      - "~/foundry/workspaces/prompt2eat/order-tool"   # the order-tool repo, cloned into the jail
+    egress_allow: ["127.0.0.1", "api.anthropic.com", "order.zaleit.com.au", "prompt2eat.com", "media.prompt2eat.com", "github.com"]
     credentials: []        # posting/keys live in n8n only, human-gated
-    notes: "Stripe/customer data is PII - access_customer_pii is a human gate."
+    notes: >
+      Stripe/customer data is PII - access_customer_pii is a human gate. The order-tool
+      repo (github.com/zenulbashar/order-tool) lives INSIDE this jail; agents build/run it
+      here and its AI features call the local Ollama endpoint (127.0.0.1:11434), never a
+      cloud model. github.com is granted for clone/pull only; pushing to main is a bright line.
 
   roster:                  # the rostering tool business (piggyback until Wave 3 pricing validated)
     fs_allow: ["~/foundry/workspaces/roster"]
