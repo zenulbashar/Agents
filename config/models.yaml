@@ -3,6 +3,7 @@
 # =============================================================================
 # Tier KEYS are stable (config/agents.yaml + scripts/generate_agents.py depend on
 # them). Concrete models refresh as releases land. See docs/08 and docs/15.
+# Verify the lineup any time with: make models-check
 # =============================================================================
 
 # ---- Runtime mode -----------------------------------------------------------
@@ -87,7 +88,7 @@ tiers:
     alt: ["gemini-frontier", "kimi-k3"]
     cost: premium-metered
 
-# ---- Kimi K3 / frontier-open models: why they are NOT a local tier ----------
+# ---- Cloud options: what they are, and why they are NOT the default ---------
 cloud_frontier_notes:
   kimi_k3:
     status: "Open WEIGHTS (Moonshot, July 2026) - but not locally runnable here."
@@ -103,6 +104,25 @@ cloud_frontier_notes:
       (~$3/M in, $15/M out). Non-sensitive work ONLY - never customer PII (that is a
       bright line), and spending is an operator gate.
 
+  openrouter:
+    what: "A CLOUD aggregator that fronts many providers behind one OpenAI-compatible API. Already egress-allowed for the marketing domain (config/access.yaml); n8n can point at it by swapping AI_BASE_URL."
+    checked: "July 2026, from secondary sources - openrouter.ai/rankings blocks automated fetch, so verify live before relying on any specific model."
+    free_tier_reality:
+      - "~20 zero-cost ':free' model IDs listed (18 July 2026); the free collection lists ~25."
+      - "Rate limits: ~50 requests/DAY on a free account (1,000/day after buying $10 of credit), 20 requests/minute."
+      - "Free models are throttled hard at peak and ROTATE OUT WITHOUT WARNING."
+      - "Free endpoints generally imply prompt logging/training - unacceptable for customer data."
+    notable_free_models: ["meta-llama/llama-4-maverick:free", "meta-llama/llama-4-scout:free", "meta-llama/llama-3.3-70b-instruct:free", "nvidia/llama-3.1-nemotron-nano-8b-v1:free", "google/gemini-2.5-pro-exp-03-25:free"]
+    verdict: >
+      NOT suitable as the company's engine. ~50 requests/day cannot feed a 24/7 runtime
+      of 59 agents, and models that vanish without notice make a daemon fail silently -
+      the opposite of what a 24/7 company needs. Local Ollama has no request cap, no
+      rotation, and no data egress.
+    sanctioned_use: >
+      OPTIONAL, non-sensitive MARKETING overflow only (batched, review-mode content),
+      by setting AI_BASE_URL/AI_MODEL in marketing/.env. NEVER customer PII, order data,
+      or anything under access_customer_pii. Paid usage is spend_money = operator gate.
+
 embeddings:
   provider: ollama
   model: "nomic-embed-text"
@@ -112,7 +132,7 @@ embeddings:
 
 # ---- Reviewer pairing (rubric #10): reviewer runs a DIFFERENT model than author -
 reviewer_policy:
-  principle: "On critical gates the reviewer runs a DIFFERENT MODEL FAMILY than the author, to break correlated failure. Under mode: local-only this is Llama vs Qwen vs Gemma - three genuinely independent families, at $0."
+  principle: "On critical gates the reviewer runs a DIFFERENT MODEL FAMILY than the author, to break correlated failure. Under mode: local-only this is Llama vs Qwen vs Gemma - three genuinely independent families, at $0. Enforced by: make models-check."
   default_reviewer_tier_for_author:
     local-small:        local-mid          # llama3.3 author  -> qwen3.6 reviewer  (llama -> qwen)
     local-mid:          local-large        # qwen3.6 author   -> gemma4 reviewer   (qwen  -> gemma)
