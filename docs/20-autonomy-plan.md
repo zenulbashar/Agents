@@ -3,6 +3,9 @@
 **Status:** proposal · **Date:** 2026-07-28 · **Host:** Mac mini M4, 16GB, macOS 26.5.1
 **Method:** repo audit + live measurement on this host + 14-agent research sweep with adversarial
 verification (58 of ~198 first-pass research claims were refuted on check; corrected values used here).
+A second, adversarial pass targeting this plan's own load-bearing claims is in **§10** — it found
+evidence against ADR-003 and ADR-008, but its verification stage was cut short by a session limit,
+so its findings carry a weaker confidence label than the rest of this document.
 
 ---
 
@@ -528,3 +531,109 @@ Stated plainly so nobody treats these as settled:
   source confirmed.
 - **The $478,550 statutory-tort damages figure** — secondary sources only; OAIC states no cap.
 - **Current Claude subscription quotas** — the pricing article 404'd.
+
+---
+
+## 10. Deep-research follow-up (2026-07-28, second pass)
+
+A second research pass was run specifically to **refute** this plan's load-bearing claims.
+
+> ⚠️ **Read the confidence caveat first.** The search and fetch phases completed, but **71 of 107
+> agents failed on a session usage limit**, so the 3-vote adversarial verification largely did not
+> run. Everything below is **sourced but not independently verified**. The first pass refuted **29%**
+> of its own first-draft claims, so treat these as leads to confirm, not settled facts. Re-run the
+> verification before acting on anything marked ⚠️.
+
+### 10.1 Evidence AGAINST this plan
+
+**⚠️ The multi-turn floor may be worse than §3 assumes.** BFCL V4 (data as of 2026-04-12):
+
+| Model | Single-turn (Non-Live AST) | **Multi-turn** |
+|---|---|---|
+| Qwen3-4B-Instruct-2507 (FC) | 87.88% | **22.12%** |
+| Qwen3-14B (FC) | 84.94% | **34.75%** |
+| Gemma-3-12b-it (Prompt) | 79.44% | **5.75%** |
+| Gemma-3-4b-it (Prompt) | 61.12% | **0.38%** |
+
+§3 used ~35% multi-turn. For the 4B class the figure may be closer to **22%**, and for Gemma-class
+12B it may be near-total collapse.
+
+**Important generational caveat, and exactly the error the first pass caught once already:** these
+are **Qwen3 and Gemma-3** numbers. This host runs **qwen3.5 and gemma4** — later generations. The
+numbers are directionally serious but **not directly applicable**. Do not restate them as if they
+describe the installed models. This is precisely why ADR-009's own eval set is the only trustworthy
+measurement.
+
+**⚠️ The agentic gap is far worse than the tool-calling gap.** On BFCL V4's *agentic* categories
+(web search + memory) — the closest published proxy to this plan's actual workload — **no model in
+the 4B–14B class exceeds ~16%**: xLAM-2-8b-fc-r 10.24%, Qwen3-4B 10.32%, Qwen3-14B 14.78%,
+Gemma-3-12b-it 15.76%, against Claude-Opus-4-5 at **79.13%**. A **5–8×** gap, much larger than the
+single-turn gap. Read this as a hard argument for the plan's narrow, read-first tool set and for
+gating every output — *not* as a reason to widen agent autonomy.
+
+**⚠️ A uniform ~6-iteration cap is the wrong shape.** Long-horizon decay is **domain-stratified**:
+software-engineering tasks degrade steeply (Graceful Degradation Score 0.90 → 0.44 across duration
+buckets) while **document-processing tasks stay nearly flat (0.74 → 0.71)**. Ticket and email triage
+— this plan's primary workload — tolerates longer chains than code-writing does. **Amend ADR-001**:
+make `max_iters` per-tool-set rather than global (e.g. 4 for code paths, 8–10 for triage).
+
+**⚠️ "Use a bigger model" does not fix catastrophic failure.** Frontier models show the *highest*
+meltdown rates — up to **19%** — because they pursue ambitious multi-step strategies that spiral.
+Catastrophic long-horizon failure is not a small-model pathology, so the ADR-001 circuit breaker is
+required at every model tier, not just locally.
+
+### 10.2 The one claim adversarial verification actually killed (0–2 vote)
+
+**Tool-use-tuned small models beat frontier models at multi-turn.** Salesforce **xLAM-2-8b-fc-r (8B)
+scores 70.00% multi-turn — above Claude-Opus-4-5 at 68.38%**, the #1 model overall. xLAM-2-3b-fc-r
+(3B) reaches 58.38%. So §3's "small models degrade multi-turn" is **too blunt**: *generic* small
+models degrade; *tool-tuned* ones do not.
+
+**But the best option is licence-blocked.** xLAM-2 is **CC-BY-NC-4.0 — non-commercial** — which
+prompt2eat and Roster cannot use. Hammer (Qwen-based) is the alternative lead: Hammer-7B 83.92%
+BFCL overall, Hammer-4B 76.05% — though those are v1/v2-era metrics with **no multi-turn category**,
+so they say nothing about the number that matters.
+
+**Action:** find an **Apache-2.0 or MIT** function-calling-tuned checkpoint in the 3–8B class and
+eval it against `qwen3.5:4b`. On this evidence, *model choice may buy more than any scaffold change*
+— which would be the single highest-leverage revision to ADR-008.
+
+### 10.3 Evidence FOR this plan
+
+- ✅ **ADR-006's scoping trap is confirmed by Microsoft's own documentation**, using `Mail.Read` as
+  the worked example: Entra consent and Exchange RBAC scopes combine as a **union**, each authority
+  acting independently, so an Entra grant is never narrowed by an RBAC resource scope. ADR-006's
+  "consent zero Exchange permissions in Entra" instruction stands.
+- ✅ **DBOS crash-safe resume from the last completed step** is a first-party guarantee, and a
+  **concurrency=1 queue** guaranteeing sequential in-order processing is documented, not invented.
+- ✅ **DBOS is a library, not a server** — the property ADR-003 depends on. (Vendor self-assessment.)
+- ✅ Multi-turn failure is driven by **accumulated context**, not by individual tool calls (base
+  69.50% → long-context 41.00%), supporting short, context-bounded chains and ADR-001's
+  `prompt_eval_count` assertion.
+
+### 10.4 Three DBOS caveats that amend ADR-003
+
+**⚠️ SQLite mode is not the vendor-sanctioned production path.** DBOS's docs say *"Postgres is
+recommended for production"*; the README mentions Postgres 19 times and SQLite **zero** times; and
+the June 2026 release notes shipped the SQLite backend for the **Go** SDK, not Python. SQLite mode
+*works* and is the zero-config default — but it is the development path. Since ADR-005 already runs
+Postgres for the ticket portal, **point DBOS at that same Postgres instead.** This removes the
+caveat at no extra footprint and is a straight improvement on ADR-003 as drafted.
+
+**🔴 DBOS priority is inverted, and unprioritised work jumps the queue.** `priority_enabled=True`
+must be set on the queue; priority runs 1 → 2,147,483,647 with a **LOW number meaning HIGHER
+priority**; and **workflows enqueued without a priority are processed BEFORE prioritised ones.**
+Foundry's existing `clamp_priority` scheme assumes the opposite. Ported naively, **urgent work would
+silently run last** — the worst kind of bug, because nothing errors.
+
+**⚠️ Do not use the global concurrency limit.** DBOS's own docs warn against it: any `PENDING`
+workflow counts toward the limit, **including leftovers from previous application versions**. On a
+frequently-redeployed daemon, stale `PENDING` rows can permanently starve a `concurrency=1` queue.
+Use per-queue worker concurrency and add a startup sweep for stale `PENDING` rows.
+
+### 10.5 Not reached
+
+The session limit stopped verification before covering **claim 4 (Australian Spam Act / Privacy Act
+exposure)** and **claim 5 (prompt injection defences)** in this pass. Both remain as stated in §6 on
+first-pass evidence, and both are **still unverified at the depth they deserve** — §6's items 3–6 are
+the highest-liability part of this plan and should be the first target of the next research run.
