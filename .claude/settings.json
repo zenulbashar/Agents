@@ -42,7 +42,7 @@
       {
         "matcher": "Bash|Write|Edit|mcp__foundry-ci__deploy|mcp__foundry-ci__sign|mcp__foundry-ops__.*",
         "hooks": [
-          { "type": "command", "command": "python3 .claude/hooks/approval_gate.py" }
+          { "type": "command", "command": "python3 /Users/zen/foundry/.claude/hooks/approval_gate.py" }
         ]
       }
     ],
@@ -50,14 +50,14 @@
       {
         "matcher": ".*",
         "hooks": [
-          { "type": "command", "command": "python3 .claude/hooks/audit_log.py" }
+          { "type": "command", "command": "python3 /Users/zen/foundry/.claude/hooks/audit_log.py" }
         ]
       }
     ],
     "SubagentStop": [
       {
         "hooks": [
-          { "type": "command", "command": "python3 .claude/hooks/subagent_stop.py" }
+          { "type": "command", "command": "python3 /Users/zen/foundry/.claude/hooks/subagent_stop.py" }
         ]
       }
     ]
