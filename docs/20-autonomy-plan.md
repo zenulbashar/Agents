@@ -277,9 +277,28 @@ operator notification, and `POST /v1/erasure` for GDPR. **56 tests pass.** The d
 API quality, because agents must drive triage — and this is the only option whose API was designed
 for that.
 
-**Repoint its model at Ollama.** `agent.py` constructs `anthropic.AsyncAnthropic(...)`; adding
-`base_url="http://127.0.0.1:11434"` makes it $0 while keeping the prescreen tool, escalation, KB
-citations and SSE streaming. **Highest-leverage single line in the plan.**
+**Repointed at Ollama 2026-07-29 — but it was NOT the one-line change first claimed here.**
+Three corrections from actually doing it:
+
+1. **Thinking must be explicitly disabled.** Ollama's Anthropic shim has thinking ON by default; a
+   64-token probe returned `stop_reason=max_tokens` with zero text and only thinking blocks. Left
+   alone, customers receive empty replies.
+2. **KB citations do not survive.** The shim rejects document blocks outright — `400: cannot
+   unmarshal object into Go struct field MessagesRequest.messages.citations of type
+   []anthropic.Citation`. It models `citations` as an array; the real API sends `{"enabled": true}`.
+   The fallback injects the same KB text as plain blocks, so **grounding survives but provenance
+   does not** — replies come back with empty `sources`. A genuine downgrade to a customer-facing
+   safety feature, not a cosmetic one.
+3. 🔴 **`qwen3.5:4b` is not adequate here, contradicting ADR-008.** Measured on a grounded question
+   ("what is your refund window?" against a KB doc stating 14 days): the **4b falsely escalated and
+   emitted no reply text at all**; `qwen3.5:9b` (12.7s) and `gemma4:12b` (16.1s) both answered
+   correctly. Over-escalation is the safe direction, but an agent that deflects nothing has no
+   purpose. Support is pinned to **9b**; prescreen stays on 4b.
+
+**Unresolved tension this creates:** ADR-008 pins one resident model to avoid ~7s swaps, but foundryd
+wants 4b while support_api wants 9b, against the same single-slot Ollama. Either accept the thrash or
+run everything on 9b (17 vs 27 tok/s, 6.6GB vs 3.5GB). Correctness beats throughput at this volume,
+so 9b-everywhere is the safer default until ADR-009's eval says otherwise.
 
 Honest gaps: the customer-facing HTML view is greenfield, and Postgres is not currently running.
 Real cost ≈ 1GB disk + 300–500MB RAM, not zero.
