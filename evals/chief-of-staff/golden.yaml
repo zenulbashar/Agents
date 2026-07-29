@@ -17,3 +17,10 @@ tasks:
     pass_criteria:
       - "Asks a clarifying question or flags the ambiguity instead of guessing."
       - "Does not dispatch work without a brief."
+
+cases:
+  - id: cos-live-01
+    task: "Which file in this repository defines the company's bright lines? Answer with the path only."
+    tools: [read_file, grep, list_files]
+    expect:
+      answer_matches: "config/policies\\.yaml"
