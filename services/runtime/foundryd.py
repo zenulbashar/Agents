@@ -47,6 +47,14 @@ OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 CALL_TIMEOUT = int(os.environ.get("FOUNDRY_MODEL_TIMEOUT", "600"))
 TICK = 15
 
+# Ollama's stock default on this host is 4096 tokens, and a generated agent system prompt is
+# ~1,876 tokens on its own - 46% of the window gone before the task. Measured cost of raising
+# it: 3.1GB -> 3.5GB resident. See docs/20-autonomy-plan.md section 1.
+NUM_CTX = int(os.environ.get("FOUNDRY_NUM_CTX", "16384"))
+CTX_WARN_RATIO = 0.7
+KEEP_ALIVE = os.environ.get("FOUNDRY_KEEP_ALIVE", "30m")   # avoid ~7s reloads between ticks
+TELEGRAM_LIMIT = 3900                                      # Telegram hard-caps a message at 4096
+
 RUNNING = True
 _FIRED = {}
 
@@ -122,7 +130,8 @@ def due_jobs(schedule, t):
         if cron_matches(cron, t):
             _FIRED[key] = stamp
             out.append({"agent": agent, "task": task,
-                        "priority": approvals.clamp_priority(job.get("priority"))})
+                        "priority": approvals.clamp_priority(job.get("priority")),
+                        "notify": bool(job.get("notify"))})
     return out
 
 
@@ -168,11 +177,40 @@ def agent_prompt(agent_key):
 
 
 def call_model(model, system, task):
-    body = {"model": model, "stream": False,
+    """One Ollama call, with the two settings that decide whether an agent works at all.
+
+    num_ctx: on overflow Ollama evicts the OLDEST NON-SYSTEM messages - the tool results and
+    prior reasoning, never the system prompt. An agent therefore loses what it just fetched and
+    re-calls the same tool forever. It reads as the model being stupid; it is a config default.
+
+    think: thinking is on by default and spends the output budget on reasoning nobody reads -
+    measured at 26x the tokens for a short reply.
+    """
+    body = {"model": model, "stream": False, "think": False, "keep_alive": KEEP_ALIVE,
+            "options": {"num_ctx": NUM_CTX},
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": task}]}
     data = post_json(OLLAMA + "/api/chat", body, CALL_TIMEOUT)
+    used = int(data.get("prompt_eval_count") or 0)
+    if used > CTX_WARN_RATIO * NUM_CTX:
+        log_activity("foundryd", "context-pressure",
+                     {"model": model, "prompt_tokens": used, "num_ctx": NUM_CTX,
+                      "note": "near the window - older non-system content is being evicted"})
     return ((data.get("message") or {}).get("content") or "").strip()
+
+
+def deliver(agent, output):
+    """Send an agent's output to the operator. Only the daemon holds the Telegram token -
+    agents never do, so 'send the report' can only ever mean 'the daemon sends it'."""
+    if not output:
+        log_activity(agent, "notify-skipped", {"reason": "agent produced no output"})
+        return
+    text = output if len(output) <= TELEGRAM_LIMIT else output[:TELEGRAM_LIMIT] + "\n[truncated]"
+    try:
+        telegram().report(text)
+        log_activity(agent, "notified", {"chars": len(text), "truncated": len(output) > TELEGRAM_LIMIT})
+    except Exception as exc:
+        log_activity(agent, "notify-failed", {"error": str(exc)})
 
 
 # --------------------------------------------------------------------------- gates
@@ -203,7 +241,7 @@ def park_for_approval(agent, cls, task, priority):
     return rec
 
 
-def run_agent(agent, task, cfg, priority=5):
+def run_agent(agent, task, cfg, priority=5, notify=False):
     """Execute on the model. Callers have already cleared the gates."""
     tier, model = resolve_model(agent, cfg)
     if not model:
@@ -229,10 +267,12 @@ def run_agent(agent, task, cfg, priority=5):
     (OUTBOX / name).write_text(json.dumps(
         {"agent": agent, "task": task, "tier": tier, "model": model,
          "priority": priority, "output": output}, indent=2))
+    if notify:
+        deliver(agent, output)
     return {"status": "done", "agent": agent, "model": model, "seconds": took}
 
 
-def dispatch(agent, task, cfg, priority=5, pre_approved=False):
+def dispatch(agent, task, cfg, priority=5, pre_approved=False, notify=False):
     policies = cfg.get("policies") or {}
     cls = classify(task, policies)
     dec = decision_for(cls, policies)
@@ -247,7 +287,7 @@ def dispatch(agent, task, cfg, priority=5, pre_approved=False):
             a = all_agents(cfg).get(agent) or {}
             log_activity(agent, "exec-gate", {"class": cls, "executive": a.get("reports_to", "unknown"),
                                               "note": "output is a PROPOSAL for the executive"})
-    return run_agent(agent, task, cfg, priority)
+    return run_agent(agent, task, cfg, priority, notify=notify)
 
 
 # --------------------------------------------------------------------------- queue
@@ -325,7 +365,8 @@ def main():
             if not is_paused:
                 run_approved(cfg)
                 for job in due_jobs(cfg.get("schedule") or {}, time.localtime()):
-                    dispatch(job["agent"], job["task"], cfg, priority=job.get("priority", 5))
+                    dispatch(job["agent"], job["task"], cfg, priority=job.get("priority", 5),
+                             notify=job.get("notify", False))
                 drain_queue(cfg)
         except Exception as exc:                        # never let one bad tick kill 24/7
             log_activity("foundryd", "tick-error", {"error": str(exc)})

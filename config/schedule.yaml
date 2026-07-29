@@ -8,13 +8,21 @@
 version: 1
 
 jobs:
-  - { agent: ceo,               cron: "0 8 * * *",    task: "Compile and send the daily operator report via Telegram (projects, pending approvals, spend vs cap, incidents, what we learned)." }
+  # notify: true -> foundryd sends this agent's output to the operator on Telegram.
+  # Without it the report is written to data/outbox/ and nobody ever sees it (it had been
+  # generating unread since 2026-07-26). The agent cannot send: only the daemon holds the token.
+  - { agent: ceo,               cron: "0 8 * * *",    notify: true, task: "Compile the daily operator report (projects, pending approvals, spend vs cap, incidents, what we learned). Be concise: this is delivered as a Telegram message, so keep it under 300 words and lead with anything that needs a decision." }
   - { agent: brain,             cron: "30 2 * * *",   task: "Re-index the vault (incl. how-to-do-this-job); flag stale/contradictory notes for the owning agents." }
   - { agent: learning-officer,  cron: "0 3 * * *",    task: "Scan allowlisted AI-industry sources; update vault/40-industry/ai-industry-watch; draft any adoption proposals (gated)." }
   - { agent: learning-officer,  cron: "0 4 * * 1",    task: "Curate vault/10-knowledge/how-to-do-this-job field notes: fold durable lessons into the doctrine and keep the compressed per-agent version (scripts/generate_agents.py) in sync via make agents; any change that LOOSENS a verification bar or bright line is operator-gated." }
   - { agent: marketing-director, cron: "0 6 * * 1",   task: "Kick the Monday marketing batch: generate the week's content to the Google Sheet review queue - NOTHING publishes." }
   - { agent: infrastructure,    cron: "0 1 * * *",    task: "Nightly backup of the memory stores; verify a restore." }
-  - { agent: support,           cron: "*/30 * * * *", task: "Triage new support tickets (KB-assisted); draft sensitive replies for approval." }
+  # DISABLED 2026-07-29. This ran every 30 minutes against ZERO ticket source and produced
+  # fabricated status reports about a live commercial business - 98 of them. The agent's own
+  # output admitted it: "Support queue state unknown (No MCP connection to live ticketing DB)".
+  # Re-enable ONLY when GET /internal/tickets on services/support_api returns real rows.
+  # See docs/20-autonomy-plan.md ADR-005.
+  # - { agent: support,         cron: "*/30 * * * *", task: "Triage new support tickets (KB-assisted); draft sensitive replies for approval." }
 
 free_time_learning:
   note: >
