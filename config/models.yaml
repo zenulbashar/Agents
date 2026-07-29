@@ -30,11 +30,11 @@ tiers:
   local-small:        # utility: classification, routing, formatting, docs, commit messages
     purpose: "Utility: classification, routing, formatting, docs, commit messages. Chosen for instruction-following."
     provider: ollama
-    model: "llama3.1:8b"
-    alt: ["phi-4-mini:3.8b"]
-    family: llama                # distinct family -> serves as cross-family reviewer
-    ranking_note: "SUBSTITUTED by Cowork 2026-07-26: original llama3.3:8b does not exist (Llama 3.3 is 70B-only; Llama 4 is MoE, smallest 67GB). llama3.1:8b (~4.9GB) is the only Llama-family 8B that fits 16GB, kept for cross-family reviewer independence. Benchmark ranking TO BE RE-VERIFIED."
-    approx_vram_gb: 5
+    model: "qwen3.5:4b"
+    alt: ["gemma4:12b"]
+    family: qwen
+    ranking_note: "MEASURED on this host 2026-07-28: ~27 tok/s decode, 3.5GB resident at num_ctx 16384, emits well-formed tool calls. Apache-2.0. Replaced llama3.1:8b, which was DELETED 2026-07-29: it was the only non-OSI licence in the stack (Llama 3.1 Community License requires 'Built with Llama' attribution) and it failed the deeper tool eval on negative and multi-turn cases. See docs/20-autonomy-plan.md ADR-008."
+    approx_vram_gb: 4
     bind: "127.0.0.1"           # BRIGHT LINE: local models never leave loopback
     cost: free-local
 
@@ -44,7 +44,7 @@ tiers:
     model: "qwen3.5:9b"
     alt: ["qwen3.5:4b"]
     family: qwen
-    ranking_note: "SUBSTITUTED by Cowork 2026-07-26: original qwen3.6:8b does not exist (Qwen3.6 smallest published size is 27B, ~17GB - too big for 16GB). qwen3.5:9b (~6.6GB) was this tier's own listed alt and fits. Benchmark ranking TO BE RE-VERIFIED."
+    ranking_note: "MEASURED on this host 2026-07-28: 16.9 tok/s decode, ~8.4s cold load, emits well-formed tool calls. Apache-2.0. Substituted for the non-existent qwen3.6:8b (Qwen3.6's smallest published size is 27B). NOTE: escalation tier only - batch 9b work into a window rather than interleaving, since a model swap costs ~7s typical with a ~40s tail on a single-slot box."
     approx_vram_gb: 7
     bind: "127.0.0.1"
     cost: free-local
@@ -132,11 +132,11 @@ embeddings:
 
 # ---- Reviewer pairing (rubric #10): reviewer runs a DIFFERENT model than author -
 reviewer_policy:
-  principle: "On critical gates the reviewer runs a DIFFERENT MODEL FAMILY than the author, to break correlated failure. Under mode: local-only this is Llama vs Qwen vs Gemma - three genuinely independent families, at $0. Enforced by: make models-check."
+  principle: "On critical gates the reviewer runs a DIFFERENT MODEL FAMILY than the author, to break correlated failure. Under mode: local-only that is Qwen vs Gemma - TWO independent families, at $0, since llama3.1:8b was deleted on 2026-07-29 (non-OSI licence + failed the tool eval). Two families is thinner than three: a qwen-authored change can only ever be reviewed by gemma4:12b, the slowest tier at ~12 tok/s. Enforced by: make models-check."
   default_reviewer_tier_for_author:
-    local-small:        local-mid          # llama3.3 author  -> qwen3.6 reviewer  (llama -> qwen)
-    local-mid:          local-large        # qwen3.6 author   -> gemma4 reviewer   (qwen  -> gemma)
-    local-large:        local-mid          # gemma4 author    -> qwen3.6 reviewer  (gemma -> qwen)
+    local-small:        local-large        # qwen3.5:4b author -> gemma4 reviewer  (qwen -> gemma)
+    local-mid:          local-large        # qwen3.5:9b author -> gemma4 reviewer  (qwen -> gemma)
+    local-large:        local-mid          # gemma4 author     -> qwen3.5 reviewer (gemma -> qwen)
     cloud-bulk:         local-large        # (hybrid) cheap-cloud author -> local reviewer
     cloud-reasoning:    local-large
     cloud-frontier:     cloud-frontier-alt # (hybrid) Claude author -> alt-provider reviewer
