@@ -457,12 +457,18 @@ than weeks, and only if the container count stays low. Mitigation: ADR-004/005/0
 **two to four** (Postgres, n8n, +1–2), never eighteen. Plus item 1 in §5 — **more disk does not
 substitute for a backup destination.**
 
-**3. Spam Act 2003 — the outreach agent is the highest-liability component.** The burden of proving
-consent sits on the sender, and an agent scraping venue contacts generates exactly zero provable
-consent. This is actively enforced: TAB **$4M** (June 2025), CBA **$3.55M**, Binance Australia
-**$2.0M**; ACMA reports >$15M in penalties in 18 months. **Recommendation: do not build the
-autonomous outreach agent.** Let it draft; require a human to send. A few hours saved against $4M
-downside is not a close call.
+**3. Spam Act 2003 — the outreach agent is the highest-liability component.** *(Verified against the
+Act and ACMA primary sources 2026-07-29 — see §11, which corrects the figures previously cited here.)*
+The **evidential burden sits on the sender** (s16(2), s16(5)), so the agent must persist
+per-recipient, contemporaneous evidence of its consent basis. A published business address **does not
+establish inferred consent** (Sch 2 cl 4(1)). **Recommendation stands and is now better supported: do
+not build the autonomous outreach agent.** Let it draft; require a human to send.
+
+**The exposure is not where I assumed, and that matters even for the draft-then-send design.** Consent,
+functional unsubscribe (s18) and sender identification (s17) are **three independently enforceable
+civil-penalty obligations**, and consent is legally irrelevant to the other two. In the June 2025 TAB
+matter roughly **99.8% of penalised messages were consent-compliant** and failed on the mechanical
+unsubscribe and sender-ID limbs. Those are exactly the failures an automated sender produces at scale.
 
 **4. Prompt injection via inbound mail/tickets.** Live from the moment ADR-006 ships. Mitigation is
 ADR-007's: the model never holds a send capability, and every tool call is classified.
@@ -634,6 +640,100 @@ Use per-queue worker concurrency and add a startup sweep for stale `PENDING` row
 ### 10.5 Not reached
 
 The session limit stopped verification before covering **claim 4 (Australian Spam Act / Privacy Act
-exposure)** and **claim 5 (prompt injection defences)** in this pass. Both remain as stated in §6 on
-first-pass evidence, and both are **still unverified at the depth they deserve** — §6's items 3–6 are
-the highest-liability part of this plan and should be the first target of the next research run.
+exposure)** and **claim 5 (prompt injection defences)** in this pass. A third pass (§11) resolved the
+Spam Act half. **The Privacy Act half, prompt injection, and the model-licence question all remain
+open.**
+
+---
+
+## 11. Spam Act 2003 — verified against primary sources (2026-07-29, third pass)
+
+A third research pass targeted the two legal questions, prompt-injection defences, and the
+model-licence question. **Only the Spam Act half completed** (111 agents, ~6.1M tokens, ~11.6 hours).
+Findings below are verified against the Authorised Version of the Act and ACMA media releases, and
+several **correct figures previously stated in §6**.
+
+### 11.1 Consent
+
+- **The evidential burden sits on the sender.** s16(1) is a flat prohibition; consent is an exception
+  under s16(2), and **s16(5) puts the evidential burden on whoever invokes it**. An outreach agent
+  must therefore persist *per-recipient, contemporaneous* evidence of its consent basis — at
+  enforcement time the operator has to produce it.
+- **A published business address does not establish inferred consent.** Sch 2 cl 4(1) expressly bars
+  inferring consent from the bare fact of publication.
+- **The "conspicuous publication" exception is cumulative across four limbs and then
+  subject-matter-limited.** All four of: (a) the address maps to one of seven listed role categories;
+  (b) conspicuous publication; (c) reasonable to assume it was published with that person's or the
+  organisation's agreement; (d) **not** accompanied by a "no unsolicited commercial electronic
+  messages" statement. Even with all four satisfied, the deemed consent only covers messages
+  **relevant to that specific role's functions or duties**. A generic ordering-SaaS pitch to a
+  scraped `info@` address does not clear this, and every limb must be evidenced per address.
+
+### 11.2 The exposure is mechanical, not consent-based
+
+**Consent, functional unsubscribe (s18) and sender identification (s17) are three independently
+enforceable civil-penalty obligations. Consent is legally irrelevant to the other two** — the word
+does not appear in the operative bodies of s17 or s18. s17 is broader still: it applies to *any*
+commercial electronic message with an Australian link.
+
+In the June 2025 TAB matter, **roughly 99.8% of the penalised messages were consent-compliant** and
+failed on the unsubscribe and sender-ID limbs (2,598 messages lacked an unsubscribe option; 3,148
+lacked sender identification). **That is where a bulk automated sender's real exposure lies**, and it
+is precisely the kind of failure a pipeline produces at scale.
+
+### 11.3 Operational rules the implementation must encode
+
+- **Two distinct deadlines that secondary sources routinely conflate.** The unsubscribe facility must
+  remain functional for **at least 30 days** after the message is sent (s18(1)(e)). Withdrawal of
+  consent takes effect at the end of **5 business days** beginning the day the recipient *sent* the
+  request (Sch 2 cl 6) — not the day your system processed it, and "business day" is measured at the
+  **marketer's** location.
+- **The unsubscribe mechanism may not** charge a fee, require extra personal information, or require
+  a login / account creation.
+- 🔴 **"Commercial" is a low threshold, and this reaches beyond outreach.** ACMA broadened its
+  phrasing in March 2026 to **"any promotional or sales content … regardless of whether the message
+  has any other purpose."** A transactional or onboarding email that merely *links* to a product page
+  is caught. **This affects prompt2eat's ordinary customer email, not just the outreach agent** — a
+  scope the plan had not previously considered.
+- **Maximum court penalties accrue per day**: $626,000/day for a company with no prior record, rising
+  to **$3,130,000/day** with one.
+
+### 11.4 Corrected figures (§6 was stale)
+
+| Previously stated | Verified position |
+|---|---|
+| CommBank $3.55M | **$7.5M paid 17 Oct 2024** for >170M non-compliant emails — its *second* action. $3.55M was the *first* (June 2023, 65M emails, no working unsubscribe) |
+| TAB ~$4M (June 2025) | Correct (A$4,003,270, MR 17/2025) **but no longer the latest** — TAB paid a further **>$2.7M on 22 July 2026**, plus a court-enforceable undertaking |
+| ">$15M in 18 months" | **Stale, not overstated.** ACMA's current rolling figure (22 July 2026) is **">$12 million"** — and on a *broader* basis (spam **and** telemarketing) than the earlier spam-only boilerplate |
+
+### 11.5 The AI angle is neutral — which is the point
+
+There is **no AI-specific, automation-specific or scraping-specific ACMA enforcement action or
+guidance** as at July 2026. The regime is entirely technology-neutral. Using an LLM neither mitigates
+nor aggravates liability — **it simply scales per-message exposure, and per-message is how penalties
+are counted.**
+
+⚠️ **Unresolved lead worth counsel's attention:** two claims in this pass asserted that **ss20–22
+create a separate, independent prohibition on address harvesting** — i.e. that using or supplying a
+list built with harvesting software is a standalone breach regardless of consent. The verification
+votes on these were contradictory and I am not asserting it. But the plan's outreach agent is
+described as scraping venue contacts, so **this is a specific question to put to counsel.**
+
+### 11.6 Still open after three passes
+
+**The Privacy Act half, indirect prompt injection, and the commercially-licensed tool-tuned model
+question all remain open**, at the same status §10 left them.
+
+**Recommendation — stop researching two of these this way.** Three passes have cost roughly 7.7M
+tokens and ~13 hours to resolve one question. The remaining ones do not have the same shape:
+
+- **Privacy Act exposure** → this needs the counsel consult already listed in §5 item 9, not more
+  search. Ask specifically about the "trades in personal information" carve-out, the statutory tort,
+  and whether the NDB scheme reaches an exempt small business.
+- **Prompt injection defences** → a narrow, targeted search, not a 100-agent sweep. ADR-007's
+  architectural mitigation (the model never holds the send capability) does not depend on the answer;
+  the research would only tell us how much *additional* defence is worth building.
+- **A commercially-licensed function-calling model** → this is an **eval, not a literature review**.
+  Pull two or three Apache-2.0 candidates and run them against ADR-009's eval set on this host. One
+  afternoon of measurement beats any amount of leaderboard reading, and it is the same eval the plan
+  needs to exist anyway.
