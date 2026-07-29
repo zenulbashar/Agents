@@ -31,8 +31,14 @@ skills: ## Generate per-agent slash commands + install all skills into .claude/c
 	$(PY) scripts/generate_skills.py --install
 
 .PHONY: eval
-eval: ## Run every golden eval set and print a per-agent pass-rate table
+eval: ## Structural check of the eval sets (no model calls - proves nothing about behaviour)
 	$(PY) scripts/run_evals.py
+
+.PHONY: eval-live
+eval-live: ## Dispatch every machine-checkable case against a local model, 3 attempts each
+	$(PY) scripts/run_evals.py --live --repeat 3 --model $(EVAL_MODEL)
+
+EVAL_MODEL ?= qwen3.5:4b
 
 .PHONY: smoke
 smoke: ## Prove the supervisor halts at a bright line (merge_to_main)

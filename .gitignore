@@ -58,3 +58,10 @@ workspaces/
 .DS_Store
 .AppleDouble
 Thumbs.db
+vault/00-inbox/_eval-scratch.md
+
+# Agent-written vault output from eval runs. Agents choose their own paths (an eval case
+# told one to write _eval-scratch.md and it wrote 00-inbox/note.md instead), so this cannot
+# be enumerated - never `git add -A` straight after `make eval-live`.
+vault/**/_eval-*
+vault/proposals/
