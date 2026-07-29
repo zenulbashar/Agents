@@ -36,7 +36,16 @@ services:
       SUPPORT_DATABASE_URL: postgresql://support_api_app:${SUPPORT_APP_DB_PASSWORD}@support_postgres:5432/${SUPPORT_POSTGRES_DB:-foundry_support}
       SUPPORT_MAINTENANCE_DATABASE_URL: postgresql://${SUPPORT_POSTGRES_USER:-foundry}:${SUPPORT_POSTGRES_PASSWORD}@support_postgres:5432/${SUPPORT_POSTGRES_DB:-foundry_support}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      SUPPORT_MODEL: ${SUPPORT_MODEL:-claude-haiku-4-5-20251001}
+      # $0 by default: Ollama's Anthropic-compatible endpoint. host.docker.internal, NOT
+      # 127.0.0.1 - inside the container that would be the container itself. Unset this to
+      # use the real Anthropic API (then set ANTHROPIC_API_KEY and a claude-* SUPPORT_MODEL).
+      SUPPORT_ANTHROPIC_BASE_URL: ${SUPPORT_ANTHROPIC_BASE_URL:-http://host.docker.internal:11434}
+      # qwen3.5:9b, not :4b. Measured 2026-07-29 on a grounded KB question ("what is your
+      # refund window?" against a doc stating 14 days): the 4b FALSELY ESCALATED with no
+      # reply text, while 9b and gemma4:12b both answered correctly. The 4b is fine for
+      # internal work; it is not adequate customer-facing.
+      SUPPORT_MODEL: ${SUPPORT_MODEL:-qwen3.5:9b}
+      SUPPORT_PRESCREEN_MODEL: ${SUPPORT_PRESCREEN_MODEL:-qwen3.5:4b}
       SUPPORT_OPERATOR_TOKEN: ${SUPPORT_OPERATOR_TOKEN:-}
       SUPPORT_PUBLIC_BASE_URL: ${SUPPORT_PUBLIC_BASE_URL:-}
       SUPPORT_PUBLIC_KEY_PROMPT2EAT: ${SUPPORT_PUBLIC_KEY_PROMPT2EAT:-}

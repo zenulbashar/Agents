@@ -65,8 +65,24 @@ def load_kb(kb_dir: Path, department: str, max_docs: int = 25) -> list[KBDoc]:
     return docs[:max_docs]
 
 
-def document_blocks(docs: list[KBDoc]) -> list[dict[str, Any]]:
-    """Anthropic content blocks for the KB, citations enabled, cached prefix."""
+def document_blocks(docs: list[KBDoc], *, plain: bool = False) -> list[dict[str, Any]]:
+    """Anthropic content blocks for the KB, citations enabled, cached prefix.
+
+    `plain=True` is the degraded form used when the endpoint is Ollama's
+    Anthropic-compatible shim, which rejects document blocks outright:
+        400 invalid_request_error - cannot unmarshal object into Go struct field
+        MessagesRequest.messages.citations of type []anthropic.Citation
+    The shim models `citations` as an array; the real API sends {"enabled": true}.
+
+    What is lost is real and should not be glossed: the answer is still grounded in
+    the same KB text, but the model no longer emits citation deltas, so `sources` on
+    a reply become empty rather than model-attested. Grounding survives; provenance
+    does not. See docs/20-autonomy-plan.md ADR-005.
+    """
+    if plain:
+        return [{"type": "text",
+                 "text": f"<kb_document title=\"{doc.title}\">\n{doc.text}\n</kb_document>"}
+                for doc in docs]
     blocks: list[dict[str, Any]] = []
     for doc in docs:
         block: dict[str, Any] = {

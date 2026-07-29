@@ -69,6 +69,9 @@ class Settings:
     apps_config_path: Path = REPO_ROOT / "config" / "support_api.yaml"
 
     anthropic_api_key: str = ""
+    # Point at Ollama's Anthropic-compatible endpoint to run this service at $0.
+    # From a container that is http://host.docker.internal:11434, not 127.0.0.1.
+    anthropic_base_url: str = ""
     model: str = "claude-haiku-4-5-20251001"
     prescreen_model: str = "claude-haiku-4-5-20251001"
     max_reply_tokens: int = 1024
@@ -105,6 +108,9 @@ class Settings:
                 env.get("SUPPORT_APPS_CONFIG", str(REPO_ROOT / "config" / "support_api.yaml"))
             ),
             anthropic_api_key=env.get("ANTHROPIC_API_KEY", ""),
+            anthropic_base_url=env.get(
+                "SUPPORT_ANTHROPIC_BASE_URL", env.get("ANTHROPIC_BASE_URL", "")
+            ),
             model=env.get("SUPPORT_MODEL", "claude-haiku-4-5-20251001"),
             prescreen_model=env.get("SUPPORT_PRESCREEN_MODEL", "claude-haiku-4-5-20251001"),
             max_reply_tokens=int(env.get("SUPPORT_MAX_REPLY_TOKENS", "1024")),

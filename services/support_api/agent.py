@@ -137,10 +137,19 @@ class SupportAgent:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._client = None
-        if settings.anthropic_api_key:
+        # Extra arguments applied to every call. Against Ollama's Anthropic-compatible
+        # endpoint, thinking is ON by default and silently eats the whole max_tokens budget:
+        # a 64-token probe returned stop_reason=max_tokens with zero text and only thinking
+        # blocks. Left on, customers would receive empty replies.
+        self._extra: dict = {}
+        if settings.anthropic_api_key or settings.anthropic_base_url:
             import anthropic
 
-            self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+            kwargs: dict = {"api_key": settings.anthropic_api_key or "ollama"}
+            if settings.anthropic_base_url:
+                kwargs["base_url"] = settings.anthropic_base_url
+                self._extra = {"thinking": {"type": "disabled"}}
+            self._client = anthropic.AsyncAnthropic(**kwargs)
 
     @property
     def available(self) -> bool:
@@ -164,6 +173,7 @@ class SupportAgent:
                 messages=[{"role": "user", "content": text}],
                 tools=[_SCREEN_TOOL],
                 tool_choice={"type": "tool", "name": "report_screen"},
+                **self._extra,
             )
             for block in resp.content:
                 if getattr(block, "type", "") == "tool_use":
@@ -199,7 +209,7 @@ class SupportAgent:
 
         # KB documents ride in the first user turn so the static prefix
         # (system + docs) is one cacheable block across the conversation.
-        doc_blocks = document_blocks(kb_docs)
+        doc_blocks = document_blocks(kb_docs, plain=bool(self.settings.anthropic_base_url))
         first = turns[0]
         first["content"] = [*doc_blocks, {"type": "text", "text": first["content"]}]
 
@@ -216,6 +226,7 @@ class SupportAgent:
             messages=turns,
             tools=[_ESCALATE_TOOL],
             stream=True,
+            **self._extra,
         )
         async for event in stream:
             etype = getattr(event, "type", "")
