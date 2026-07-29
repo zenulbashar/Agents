@@ -24,7 +24,6 @@ import os
 import signal
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 try:
@@ -36,6 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from services.runtime import approvals            # noqa: E402
+from services.runtime import executor             # noqa: E402
 
 CONFIG = ROOT / "config"
 LOGS = ROOT / "logs"
@@ -46,14 +46,11 @@ AGENT_DIR = ROOT / ".claude" / "agents"
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 CALL_TIMEOUT = int(os.environ.get("FOUNDRY_MODEL_TIMEOUT", "600"))
 TICK = 15
+TELEGRAM_LIMIT = 3900          # Telegram hard-caps a message at 4096
 
-# Ollama's stock default on this host is 4096 tokens, and a generated agent system prompt is
-# ~1,876 tokens on its own - 46% of the window gone before the task. Measured cost of raising
-# it: 3.1GB -> 3.5GB resident. See docs/20-autonomy-plan.md section 1.
-NUM_CTX = int(os.environ.get("FOUNDRY_NUM_CTX", "16384"))
-CTX_WARN_RATIO = 0.7
-KEEP_ALIVE = os.environ.get("FOUNDRY_KEEP_ALIVE", "30m")   # avoid ~7s reloads between ticks
-TELEGRAM_LIMIT = 3900                                      # Telegram hard-caps a message at 4096
+# num_ctx / think / keep_alive live in services/runtime/executor.py, which owns every model
+# call. Deliberately NOT duplicated here: two places configuring the same thing is how the
+# 4096-token default went unnoticed in the first place.
 
 RUNNING = True
 _FIRED = {}
@@ -136,14 +133,6 @@ def due_jobs(schedule, t):
 
 
 # ---------------------------------------------------------------------- the model
-def post_json(url, payload, timeout):
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # never proxy localhost
-    with opener.open(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
 def all_agents(cfg):
     agents = dict((cfg.get("agents") or {}).get("agents") or {})
     agents.update((cfg.get("extra") or {}).get("agents") or {})
@@ -174,29 +163,6 @@ def agent_prompt(agent_key):
         if len(parts) >= 3:
             return parts[2].strip()
     return text.strip()
-
-
-def call_model(model, system, task):
-    """One Ollama call, with the two settings that decide whether an agent works at all.
-
-    num_ctx: on overflow Ollama evicts the OLDEST NON-SYSTEM messages - the tool results and
-    prior reasoning, never the system prompt. An agent therefore loses what it just fetched and
-    re-calls the same tool forever. It reads as the model being stupid; it is a config default.
-
-    think: thinking is on by default and spends the output budget on reasoning nobody reads -
-    measured at 26x the tokens for a short reply.
-    """
-    body = {"model": model, "stream": False, "think": False, "keep_alive": KEEP_ALIVE,
-            "options": {"num_ctx": NUM_CTX},
-            "messages": [{"role": "system", "content": system},
-                         {"role": "user", "content": task}]}
-    data = post_json(OLLAMA + "/api/chat", body, CALL_TIMEOUT)
-    used = int(data.get("prompt_eval_count") or 0)
-    if used > CTX_WARN_RATIO * NUM_CTX:
-        log_activity("foundryd", "context-pressure",
-                     {"model": model, "prompt_tokens": used, "num_ctx": NUM_CTX,
-                      "note": "near the window - older non-system content is being evicted"})
-    return ((data.get("message") or {}).get("content") or "").strip()
 
 
 def deliver(agent, output):
@@ -253,15 +219,24 @@ def run_agent(agent, task, cfg, priority=5, notify=False):
         return {"status": "error", "reason": "missing agent prompt"}
 
     started = time.time()
-    try:
-        output = call_model(model, system, task)
-    except Exception as exc:
-        log_activity(agent, "error", {"task": task, "model": model, "error": str(exc)})
-        return {"status": "error", "reason": str(exc)}
-
+    granted = executor.tools_for_agent(agent)
+    result = executor.run(agent, system, task, model, tool_names=granted, log=log_activity)
     took = round(time.time() - started, 1)
+    output = result.get("output") or ""
+
     log_activity(agent, "run", {"task": task, "tier": tier, "model": model,
-                                "priority": priority, "seconds": took, "chars": len(output)})
+                                "priority": priority, "seconds": took, "chars": len(output),
+                                "status": result.get("status"), "tools": granted,
+                                "iterations": result.get("iterations"),
+                                "tool_calls": len(result.get("tool_calls") or [])})
+
+    if result.get("status") != "done":
+        # 'cap' means the model never stopped asking for tools. Surfaced as an error rather
+        # than written to the outbox, because a capped run has no trustworthy output.
+        reason = result.get("reason") or result.get("status")
+        log_activity(agent, "error", {"task": task, "model": model, "reason": reason,
+                                      "hit_cap": result.get("hit_cap", False)})
+        return {"status": "error", "agent": agent, "reason": reason}
     OUTBOX.mkdir(parents=True, exist_ok=True)
     name = time.strftime("%Y%m%d-%H%M%S") + "-" + safe(agent) + ".json"
     (OUTBOX / name).write_text(json.dumps(
