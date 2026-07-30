@@ -87,6 +87,10 @@ def tools_for_agent(agent_key: str):
         local = GRANT_MAP.get(raw.strip())
         if local and local not in granted:
             granted.append(local)
+    # Anyone who may read files may search the shared brain. There is no separate frontmatter
+    # grant for it because Claude Code has no equivalent tool to map from.
+    if "read_file" in granted and "search_memory" not in granted:
+        granted.append("search_memory")
     return granted or list(toolkit.READ_ONLY)
 
 
