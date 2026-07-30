@@ -134,6 +134,25 @@ def write_note(args: dict) -> str:
     return f"wrote {len(content)} chars to {path.relative_to(jail.ALLOW_ROOT)} (provenance stamp appended)"
 
 
+def search_memory(args: dict) -> str:
+    """Hybrid keyword+semantic search over the vault and docs (ADR-004).
+
+    Returned to the model as path + heading + body so it can cite where an answer came
+    from. An agent that answers from this without a path is answering from memory.
+    """
+    from services.runtime import memory
+
+    query = _require_str(args, "query")
+    try:
+        hits = memory.search(query, k=int(args.get("k") or 5))
+    except Exception as exc:
+        raise ToolError(f"memory search failed ({exc}); run `make index` to build it")
+    if not hits:
+        return "(no matches - the index may not be built; run `make index`)"
+    return _clip("\n\n".join(
+        f"[{h['path']}] {h['heading']}\n{h['body']}" for h in hits))
+
+
 def run_check(args: dict) -> str:
     name = _require_str(args, "name")
     if name not in CHECKS:
@@ -168,6 +187,12 @@ SPECS = [
      "schema": {"type": "object", "required": ["path", "content"],
                 "properties": {"path": {"type": "string", "description": "e.g. vault/00-inbox/note.md"},
                                "content": {"type": "string"}}}},
+    {"name": "search_memory", "handler": search_memory,
+     "description": "Search the shared vault and docs for relevant passages. Prefer this over "
+                    "guessing: it returns the file path so you can cite where an answer came from.",
+     "schema": {"type": "object", "required": ["query"],
+                "properties": {"query": {"type": "string", "description": "what you are looking for"},
+                               "k": {"type": "integer", "description": "how many passages, default 5"}}}},
     {"name": "run_check", "handler": run_check,
      "description": "Run one named, pre-approved check. You cannot run arbitrary commands.",
      "schema": {"type": "object", "required": ["name"],
@@ -175,7 +200,7 @@ SPECS = [
 ]
 
 BY_NAME = {spec["name"]: spec for spec in SPECS}
-READ_ONLY = ["read_file", "list_files", "grep"]
+READ_ONLY = ["read_file", "list_files", "grep", "search_memory"]
 
 
 def schemas(names=None):

@@ -30,6 +30,14 @@ agents: ## Generate subagents + catalog (incl. agents_extra), then structural-ch
 skills: ## Generate per-agent slash commands + install all skills into .claude/commands/foundry/
 	$(PY) scripts/generate_skills.py --install
 
+.PHONY: test
+test: ## Run every Python test suite (runtime jail/memory + support_api)
+	$(PY) -m pytest -q
+
+.PHONY: index
+index: ## Rebuild the vault/docs retrieval index (derived + disposable; markdown is the truth)
+	$(PY) -m services.runtime.memory
+
 .PHONY: eval
 eval: ## Structural check of the eval sets (no model calls - proves nothing about behaviour)
 	$(PY) scripts/run_evals.py
