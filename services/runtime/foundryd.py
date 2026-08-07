@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from services.runtime import approvals            # noqa: E402
 from services.runtime import executor             # noqa: E402
+from services.runtime import health               # noqa: E402
 
 CONFIG = ROOT / "config"
 LOGS = ROOT / "logs"
@@ -163,6 +164,41 @@ def agent_prompt(agent_key):
         if len(parts) >= 3:
             return parts[2].strip()
     return text.strip()
+
+
+HEALTH_INTERVAL = int(os.environ.get("FOUNDRY_HEALTH_INTERVAL", "3600"))
+_HEALTH = {"checked_at": 0.0, "healthy": None}
+
+
+def health_tick(force=False):
+    """Self-check on a schedule, alerting the operator only on a CHANGE of state.
+
+    Alerting every hour on a persistent fault trains the operator to ignore the channel,
+    which is the same as having no alerting. A recovery is worth saying too - otherwise a
+    problem report has no closing bracket and the operator has to go and look.
+    """
+    now = time.time()
+    if not force and now - _HEALTH["checked_at"] < HEALTH_INTERVAL:
+        return
+    _HEALTH["checked_at"] = now
+
+    results = health.check_all()
+    healthy, line = health.summarise(results)
+    log_activity("foundryd", "health", {"healthy": healthy, "checks": results})
+
+    first = _HEALTH["healthy"] is None
+    changed = (not first) and healthy != _HEALTH["healthy"]
+    _HEALTH["healthy"] = healthy
+
+    # On the very first check, stay quiet unless something is actually wrong: a daemon
+    # restart should not page the operator to say it is fine.
+    if (first and not healthy) or changed:
+        prefix = "Foundry recovered - " if healthy else "Foundry problem - "
+        try:
+            telegram().report(prefix + line)
+            log_activity("foundryd", "health-alerted", {"healthy": healthy})
+        except Exception as exc:
+            log_activity("foundryd", "health-alert-failed", {"error": str(exc)})
 
 
 def deliver(agent, output):
@@ -322,6 +358,7 @@ def main():
     n = len(all_agents(cfg))
     mode = (cfg.get("models") or {}).get("mode", "local-only")
     log_activity("foundryd", "start", {"agents": n, "mode": mode, "ollama": OLLAMA})
+    health_tick(force=True)          # fail loudly at boot, not silently at first dispatch
     print("foundryd up: " + str(n) + " agents, mode=" + str(mode) + ", 24/7 (Cowork-independent).")
 
     while RUNNING:
@@ -330,6 +367,8 @@ def main():
                 telegram().poll_once()                 # operator taps + commands
             except Exception as exc:
                 log_activity("foundryd", "telegram-poll-failed", {"error": str(exc)})
+
+            health_tick()
 
             is_paused = False
             try:
